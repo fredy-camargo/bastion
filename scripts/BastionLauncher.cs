@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
@@ -24,9 +25,11 @@ namespace BastionDesktop
             string distDir = Path.GetFullPath(Path.Combine(baseDir, "dist"));
             string indexPath = Path.Combine(distDir, "index.html");
 
+            bool isSelfTest = (args != null && args.Length > 0 && string.Equals(args[0], "--self-test", StringComparison.Ordinal));
+
             if (!File.Exists(indexPath))
             {
-                if (args != null && args.Length > 0 && args[0] == "--self-test")
+                if (isSelfTest)
                 {
                     return 1;
                 }
@@ -39,7 +42,7 @@ namespace BastionDesktop
                 return 1;
             }
 
-            if (args != null && args.Length > 0 && args[0] == "--self-test")
+            if (isSelfTest)
             {
                 return RunSelfTest(distDir);
             }
@@ -127,7 +130,7 @@ namespace BastionDesktop
                     server.Start();
                     int port = server.Port;
 
-                    string homeResponse = SendRawHttpGet(port, "/");
+                    string homeResponse = SendRawHttp(port, "GET", "/", null, null);
                     if (homeResponse.IndexOf("HTTP/1.1 200 OK", StringComparison.Ordinal) < 0 ||
                         homeResponse.IndexOf("Content-Security-Policy:", StringComparison.OrdinalIgnoreCase) < 0 ||
                         homeResponse.IndexOf("X-Frame-Options: DENY", StringComparison.OrdinalIgnoreCase) < 0 ||
@@ -136,8 +139,45 @@ namespace BastionDesktop
                         return 1;
                     }
 
-                    string traversalResponse = SendRawHttpGet(port, "/../package.json");
+                    string traversalResponse = SendRawHttp(port, "GET", "/../package.json", null, null);
                     if (traversalResponse.IndexOf("HTTP/1.1 403 Forbidden", StringComparison.Ordinal) < 0)
+                    {
+                        return 1;
+                    }
+
+                    // Anti-CSRF check 1: missing Origin / X-Bastion-Desktop
+                    string csrfNoHeaders = SendRawHttp(port, "POST", "/__bastion/clipboard/clear", null, "");
+                    if (csrfNoHeaders.IndexOf("HTTP/1.1 403 Forbidden", StringComparison.Ordinal) < 0)
+                    {
+                        return 1;
+                    }
+
+                    // Anti-CSRF check 2: evil Origin
+                    Dictionary<string, string> evilHeaders = new Dictionary<string, string>();
+                    evilHeaders["Origin"] = "https://evil.example";
+                    evilHeaders["X-Bastion-Desktop"] = "1";
+                    string csrfEvilOrigin = SendRawHttp(port, "POST", "/__bastion/clipboard/clear", evilHeaders, "");
+                    if (csrfEvilOrigin.IndexOf("HTTP/1.1 403 Forbidden", StringComparison.Ordinal) < 0)
+                    {
+                        return 1;
+                    }
+
+                    // Valid native clipboard copy & clear
+                    Dictionary<string, string> validHeaders = new Dictionary<string, string>();
+                    validHeaders["Origin"] = "http://127.0.0.1:" + port;
+                    validHeaders["X-Bastion-Desktop"] = "1";
+                    validHeaders["Sec-Fetch-Site"] = "same-origin";
+
+                    string copyOk = SendRawHttp(port, "POST", "/__bastion/clipboard/copy", validHeaders, "bastion-selftest-token");
+                    if (copyOk.IndexOf("HTTP/1.1 200 OK", StringComparison.Ordinal) < 0 ||
+                        copyOk.IndexOf("\"ok\":true", StringComparison.Ordinal) < 0)
+                    {
+                        return 1;
+                    }
+
+                    string clearOk = SendRawHttp(port, "POST", "/__bastion/clipboard/clear", validHeaders, "");
+                    if (clearOk.IndexOf("HTTP/1.1 200 OK", StringComparison.Ordinal) < 0 ||
+                        clearOk.IndexOf("\"cleared\":true", StringComparison.Ordinal) < 0)
                     {
                         return 1;
                     }
@@ -150,7 +190,7 @@ namespace BastionDesktop
             }
         }
 
-        private static string SendRawHttpGet(int port, string path)
+        private static string SendRawHttp(int port, string method, string path, Dictionary<string, string> extraHeaders, string bodyText)
         {
             using (TcpClient client = new TcpClient())
             {
@@ -159,9 +199,30 @@ namespace BastionDesktop
                 client.Connect(IPAddress.Loopback, port);
                 using (NetworkStream stream = client.GetStream())
                 {
-                    string request = "GET " + path + " HTTP/1.1\r\nHost: 127.0.0.1:" + port + "\r\nConnection: close\r\n\r\n";
-                    byte[] reqBytes = Encoding.ASCII.GetBytes(request);
-                    stream.Write(reqBytes, 0, reqBytes.Length);
+                    byte[] bodyBytes = string.IsNullOrEmpty(bodyText) ? new byte[0] : Encoding.UTF8.GetBytes(bodyText);
+                    StringBuilder sb = new StringBuilder();
+                    sb.Append(method).Append(' ').Append(path).Append(" HTTP/1.1\r\n");
+                    sb.Append("Host: 127.0.0.1:").Append(port).Append("\r\n");
+                    if (extraHeaders != null)
+                    {
+                        foreach (KeyValuePair<string, string> kv in extraHeaders)
+                        {
+                            sb.Append(kv.Key).Append(": ").Append(kv.Value).Append("\r\n");
+                        }
+                    }
+                    if (method == "POST")
+                    {
+                        sb.Append("Content-Type: text/plain; charset=utf-8\r\n");
+                        sb.Append("Content-Length: ").Append(bodyBytes.Length).Append("\r\n");
+                    }
+                    sb.Append("Connection: close\r\n\r\n");
+
+                    byte[] headBytes = Encoding.ASCII.GetBytes(sb.ToString());
+                    stream.Write(headBytes, 0, headBytes.Length);
+                    if (bodyBytes.Length > 0)
+                    {
+                        stream.Write(bodyBytes, 0, bodyBytes.Length);
+                    }
                     stream.Flush();
 
                     using (MemoryStream ms = new MemoryStream())
@@ -221,6 +282,185 @@ namespace BastionDesktop
                 }
             }
             return null;
+        }
+    }
+
+    internal static class NativeClipboard
+    {
+        private const uint CF_UNICODETEXT = 13;
+        private const uint GMEM_MOVEABLE = 0x0002;
+        private const uint GMEM_ZEROINIT = 0x0040;
+        private static readonly object ClipboardLock = new object();
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool OpenClipboard(IntPtr hWndNewOwner);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool CloseClipboard();
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool EmptyClipboard();
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern IntPtr SetClipboardData(uint uFormat, IntPtr hMem);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern uint RegisterClipboardFormat(string lpszFormat);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern IntPtr GlobalAlloc(uint uFlags, UIntPtr dwBytes);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern IntPtr GlobalLock(IntPtr hMem);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool GlobalUnlock(IntPtr hMem);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern IntPtr GlobalFree(IntPtr hMem);
+
+        private static bool OpenWithRetry()
+        {
+            for (int attempt = 0; attempt < 12; attempt++)
+            {
+                if (OpenClipboard(IntPtr.Zero))
+                {
+                    return true;
+                }
+                Thread.Sleep(25);
+            }
+            return false;
+        }
+
+        private static void SetDwordFormat(string formatName, int value)
+        {
+            uint formatId = RegisterClipboardFormat(formatName);
+            if (formatId == 0)
+            {
+                return;
+            }
+
+            IntPtr hMem = GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, new UIntPtr(4));
+            if (hMem == IntPtr.Zero)
+            {
+                return;
+            }
+
+            IntPtr ptr = GlobalLock(hMem);
+            if (ptr == IntPtr.Zero)
+            {
+                GlobalFree(hMem);
+                return;
+            }
+
+            try
+            {
+                Marshal.WriteInt32(ptr, value);
+            }
+            finally
+            {
+                GlobalUnlock(hMem);
+            }
+
+            if (SetClipboardData(formatId, hMem) == IntPtr.Zero)
+            {
+                GlobalFree(hMem);
+            }
+        }
+
+        public static bool SetSensitiveText(string text)
+        {
+            string safeText = text ?? string.Empty;
+            char[] chars = safeText.ToCharArray();
+
+            lock (ClipboardLock)
+            {
+                bool opened = false;
+                try
+                {
+                    opened = OpenWithRetry();
+                    if (!opened)
+                    {
+                        return false;
+                    }
+
+                    if (!EmptyClipboard())
+                    {
+                        return false;
+                    }
+
+                    UIntPtr byteCount = new UIntPtr((uint)((chars.Length + 1) * 2));
+                    IntPtr hGlobal = GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, byteCount);
+                    if (hGlobal == IntPtr.Zero)
+                    {
+                        return false;
+                    }
+
+                    IntPtr ptr = GlobalLock(hGlobal);
+                    if (ptr == IntPtr.Zero)
+                    {
+                        GlobalFree(hGlobal);
+                        return false;
+                    }
+
+                    try
+                    {
+                        if (chars.Length > 0)
+                        {
+                            Marshal.Copy(chars, 0, ptr, chars.Length);
+                        }
+                    }
+                    finally
+                    {
+                        GlobalUnlock(hGlobal);
+                    }
+
+                    if (SetClipboardData(CF_UNICODETEXT, hGlobal) == IntPtr.Zero)
+                    {
+                        GlobalFree(hGlobal);
+                        return false;
+                    }
+
+                    // Prevent Windows Clipboard History (Win+V), Cloud Sync, and monitors from capturing secrets
+                    SetDwordFormat("ExcludeClipboardContentFromMonitorProcessing", 1);
+                    SetDwordFormat("CanIncludeInClipboardHistory", 0);
+                    SetDwordFormat("CanUploadToCloudClipboard", 0);
+
+                    return true;
+                }
+                finally
+                {
+                    Array.Clear(chars, 0, chars.Length);
+                    if (opened)
+                    {
+                        CloseClipboard();
+                    }
+                }
+            }
+        }
+
+        public static bool Clear()
+        {
+            lock (ClipboardLock)
+            {
+                bool opened = false;
+                try
+                {
+                    opened = OpenWithRetry();
+                    if (!opened)
+                    {
+                        return false;
+                    }
+                    return EmptyClipboard();
+                }
+                finally
+                {
+                    if (opened)
+                    {
+                        CloseClipboard();
+                    }
+                }
+            }
         }
     }
 
@@ -345,6 +585,12 @@ namespace BastionDesktop
             }
             _exiting = true;
 
+            if (_server != null && _server.HasCopiedSecret)
+            {
+                NativeClipboard.Clear();
+                _server.ClearCopiedSecretFlag();
+            }
+
             if (_watchdogTimer != null)
             {
                 _watchdogTimer.Stop();
@@ -432,6 +678,9 @@ namespace BastionDesktop
 
     internal sealed class StaticVaultServer : IDisposable
     {
+        private const int MaxHeaderBytes = 16384;
+        private const int MaxClipboardBodyBytes = 65536;
+
         private static readonly Dictionary<string, string> MimeTypes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             { ".html", "text/html; charset=utf-8" },
@@ -450,8 +699,9 @@ namespace BastionDesktop
         private readonly string _distDir;
         private readonly string _distRootWithSep;
         private readonly TcpListener _listener;
-        private readonly object _timeLock = new object();
+        private readonly object _stateLock = new object();
         private DateTime _lastRequestUtc;
+        private bool _hasCopiedSecret;
         private Thread _acceptThread;
         private volatile bool _running;
 
@@ -474,16 +724,43 @@ namespace BastionDesktop
         {
             get
             {
-                lock (_timeLock)
+                lock (_stateLock)
                 {
                     return _lastRequestUtc;
                 }
             }
         }
 
+        public bool HasCopiedSecret
+        {
+            get
+            {
+                lock (_stateLock)
+                {
+                    return _hasCopiedSecret;
+                }
+            }
+        }
+
+        public void ClearCopiedSecretFlag()
+        {
+            lock (_stateLock)
+            {
+                _hasCopiedSecret = false;
+            }
+        }
+
+        private void SetCopiedSecretFlag(bool value)
+        {
+            lock (_stateLock)
+            {
+                _hasCopiedSecret = value;
+            }
+        }
+
         private void TouchRequestTime()
         {
-            lock (_timeLock)
+            lock (_stateLock)
             {
                 _lastRequestUtc = DateTime.UtcNow;
             }
@@ -528,22 +805,23 @@ namespace BastionDesktop
                 client.ReceiveTimeout = 5000;
                 client.SendTimeout = 10000;
                 using (NetworkStream stream = client.GetStream())
-                using (StreamReader reader = new StreamReader(stream, Encoding.ASCII, false, 1024, true))
                 {
-                    string requestLine = reader.ReadLine();
-                    if (string.IsNullOrEmpty(requestLine))
+                    byte[] headerBuffer;
+                    byte[] leftoverBody;
+                    if (!ReadHeaderBlock(stream, out headerBuffer, out leftoverBody))
                     {
                         return;
                     }
 
-                    int headerCount = 0;
-                    string headerLine;
-                    while ((headerLine = reader.ReadLine()) != null && headerLine.Length > 0 && headerCount < 64)
+                    string headerText = Encoding.ASCII.GetString(headerBuffer);
+                    string[] lines = headerText.Split(new string[] { "\r\n" }, StringSplitOptions.None);
+                    if (lines.Length == 0 || string.IsNullOrEmpty(lines[0]))
                     {
-                        headerCount++;
+                        WriteStatus(stream, 400, "Bad Request", "Bad Request", false);
+                        return;
                     }
 
-                    string[] parts = requestLine.Split(' ');
+                    string[] parts = lines[0].Split(' ');
                     if (parts.Length < 2)
                     {
                         WriteStatus(stream, 400, "Bad Request", "Bad Request", false);
@@ -551,13 +829,6 @@ namespace BastionDesktop
                     }
 
                     string method = parts[0].ToUpperInvariant();
-                    if (method != "GET" && method != "HEAD")
-                    {
-                        WriteStatus(stream, 405, "Method Not Allowed", "Method Not Allowed", false);
-                        return;
-                    }
-
-                    bool headOnly = (method == "HEAD");
                     string rawTarget = parts[1];
                     int queryIdx = rawTarget.IndexOf('?');
                     if (queryIdx >= 0)
@@ -565,6 +836,22 @@ namespace BastionDesktop
                         rawTarget = rawTarget.Substring(0, queryIdx);
                     }
 
+                    Dictionary<string, string> reqHeaders = ParseHeaders(lines);
+
+                    if (string.Equals(rawTarget, "/__bastion/clipboard/copy", StringComparison.Ordinal) ||
+                        string.Equals(rawTarget, "/__bastion/clipboard/clear", StringComparison.Ordinal))
+                    {
+                        HandleClipboardEndpoint(stream, method, rawTarget, reqHeaders, leftoverBody);
+                        return;
+                    }
+
+                    if (method != "GET" && method != "HEAD")
+                    {
+                        WriteStatus(stream, 405, "Method Not Allowed", "Method Not Allowed", false);
+                        return;
+                    }
+
+                    bool headOnly = (method == "HEAD");
                     string decodedPath;
                     try
                     {
@@ -643,6 +930,208 @@ namespace BastionDesktop
                 {
                 }
             }
+        }
+
+        private void HandleClipboardEndpoint(
+            NetworkStream stream,
+            string method,
+            string route,
+            Dictionary<string, string> reqHeaders,
+            byte[] leftoverBody)
+        {
+            if (method != "POST")
+            {
+                WriteJsonStatus(stream, 405, "Method Not Allowed", "{\"error\":\"method_not_allowed\"}");
+                return;
+            }
+
+            if (!IsTrustedDesktopRequest(reqHeaders))
+            {
+                WriteJsonStatus(stream, 403, "Forbidden", "{\"error\":\"forbidden\"}");
+                return;
+            }
+
+            if (string.Equals(route, "/__bastion/clipboard/clear", StringComparison.Ordinal))
+            {
+                bool cleared = NativeClipboard.Clear();
+                if (cleared)
+                {
+                    SetCopiedSecretFlag(false);
+                    WriteJsonStatus(stream, 200, "OK", "{\"cleared\":true}");
+                }
+                else
+                {
+                    WriteJsonStatus(stream, 503, "Service Unavailable", "{\"cleared\":false}");
+                }
+                return;
+            }
+
+            string lenHeader;
+            int contentLength = 0;
+            if (!reqHeaders.TryGetValue("Content-Length", out lenHeader) ||
+                !int.TryParse(lenHeader, NumberStyles.Integer, CultureInfo.InvariantCulture, out contentLength) ||
+                contentLength < 0)
+            {
+                WriteJsonStatus(stream, 400, "Bad Request", "{\"error\":\"invalid_content_length\"}");
+                return;
+            }
+
+            if (contentLength > MaxClipboardBodyBytes)
+            {
+                WriteJsonStatus(stream, 413, "Payload Too Large", "{\"error\":\"payload_too_large\"}");
+                return;
+            }
+
+            byte[] bodyBytes = new byte[contentLength];
+            try
+            {
+                int copied = 0;
+                if (leftoverBody != null && leftoverBody.Length > 0)
+                {
+                    copied = Math.Min(contentLength, leftoverBody.Length);
+                    Buffer.BlockCopy(leftoverBody, 0, bodyBytes, 0, copied);
+                    Array.Clear(leftoverBody, 0, leftoverBody.Length);
+                }
+
+                while (copied < contentLength)
+                {
+                    int read = stream.Read(bodyBytes, copied, contentLength - copied);
+                    if (read <= 0)
+                    {
+                        WriteJsonStatus(stream, 400, "Bad Request", "{\"error\":\"incomplete_body\"}");
+                        return;
+                    }
+                    copied += read;
+                }
+
+                string secretText = Encoding.UTF8.GetString(bodyBytes);
+                bool ok = NativeClipboard.SetSensitiveText(secretText);
+                if (ok)
+                {
+                    SetCopiedSecretFlag(true);
+                    WriteJsonStatus(stream, 200, "OK", "{\"ok\":true}");
+                }
+                else
+                {
+                    WriteJsonStatus(stream, 503, "Service Unavailable", "{\"ok\":false}");
+                }
+            }
+            finally
+            {
+                Array.Clear(bodyBytes, 0, bodyBytes.Length);
+            }
+        }
+
+        private bool IsTrustedDesktopRequest(Dictionary<string, string> headers)
+        {
+            string expectedHost = "127.0.0.1:" + this.Port.ToString(CultureInfo.InvariantCulture);
+            string expectedOrigin = "http://" + expectedHost;
+
+            string host;
+            if (!headers.TryGetValue("Host", out host) || !string.Equals(host, expectedHost, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            string origin;
+            if (!headers.TryGetValue("Origin", out origin) || !string.Equals(origin, expectedOrigin, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            string marker;
+            if (!headers.TryGetValue("X-Bastion-Desktop", out marker) || !string.Equals(marker, "1", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            string secFetchSite;
+            if (headers.TryGetValue("Sec-Fetch-Site", out secFetchSite) &&
+                !string.Equals(secFetchSite, "same-origin", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool ReadHeaderBlock(NetworkStream stream, out byte[] headerBytes, out byte[] leftoverBody)
+        {
+            headerBytes = null;
+            leftoverBody = null;
+
+            byte[] buffer = new byte[MaxHeaderBytes];
+            int totalRead = 0;
+
+            while (totalRead < MaxHeaderBytes)
+            {
+                int read = stream.Read(buffer, totalRead, MaxHeaderBytes - totalRead);
+                if (read <= 0)
+                {
+                    break;
+                }
+                totalRead += read;
+
+                int endIdx = FindHeaderEnd(buffer, totalRead);
+                if (endIdx >= 0)
+                {
+                    headerBytes = new byte[endIdx];
+                    Buffer.BlockCopy(buffer, 0, headerBytes, 0, endIdx);
+
+                    int bodyStart = endIdx + 4;
+                    int leftoverCount = totalRead - bodyStart;
+                    leftoverBody = new byte[leftoverCount];
+                    if (leftoverCount > 0)
+                    {
+                        Buffer.BlockCopy(buffer, bodyStart, leftoverBody, 0, leftoverCount);
+                    }
+                    Array.Clear(buffer, 0, totalRead);
+                    return true;
+                }
+            }
+
+            Array.Clear(buffer, 0, totalRead);
+            return false;
+        }
+
+        private static int FindHeaderEnd(byte[] buffer, int length)
+        {
+            for (int i = 0; i <= length - 4; i++)
+            {
+                if (buffer[i] == 13 && buffer[i + 1] == 10 && buffer[i + 2] == 13 && buffer[i + 3] == 10)
+                {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        private static Dictionary<string, string> ParseHeaders(string[] lines)
+        {
+            Dictionary<string, string> headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            for (int i = 1; i < lines.Length && i <= 64; i++)
+            {
+                string line = lines[i];
+                if (string.IsNullOrEmpty(line))
+                {
+                    continue;
+                }
+                int colon = line.IndexOf(':');
+                if (colon <= 0)
+                {
+                    continue;
+                }
+                string name = line.Substring(0, colon).Trim();
+                string value = line.Substring(colon + 1).Trim();
+                headers[name] = value;
+            }
+            return headers;
+        }
+
+        private static void WriteJsonStatus(NetworkStream stream, int statusCode, string reason, string json)
+        {
+            byte[] body = Encoding.UTF8.GetBytes(json);
+            WriteResponse(stream, statusCode, reason, "application/json; charset=utf-8", "no-store", body, false);
         }
 
         private static void WriteStatus(NetworkStream stream, int statusCode, string reason, string text, bool headOnly)

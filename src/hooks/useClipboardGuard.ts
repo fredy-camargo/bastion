@@ -8,6 +8,38 @@ export interface ClipboardGuardState {
   statusMessage: string | null;
 }
 
+async function copyNativeDesktopClipboard(text: string): Promise<boolean> {
+  try {
+    const res = await fetch('/__bastion/clipboard/copy', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'X-Bastion-Desktop': '1',
+      },
+      body: text,
+      credentials: 'same-origin',
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function clearNativeDesktopClipboard(): Promise<boolean> {
+  try {
+    const res = await fetch('/__bastion/clipboard/clear', {
+      method: 'POST',
+      headers: {
+        'X-Bastion-Desktop': '1',
+      },
+      credentials: 'same-origin',
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 async function writeClipboardSafe(text: string): Promise<boolean> {
   try {
     if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
@@ -105,7 +137,7 @@ export function useClipboardGuard(defaultTimeoutSec: number) {
         statusMessage: null,
       });
 
-      const wiped = await writeClipboardSafe('');
+      const wiped = (await clearNativeDesktopClipboard()) || (await writeClipboardSafe(''));
       if (opSeqRef.current !== myOp) return;
 
       if (wiped) {
@@ -140,7 +172,7 @@ export function useClipboardGuard(defaultTimeoutSec: number) {
       clearNoticeTimer();
       pendingWipeRef.current = false;
 
-      const ok = await writeClipboardSafe(value);
+      const ok = (await copyNativeDesktopClipboard(value)) || (await writeClipboardSafe(value));
       if (opSeqRef.current !== myOp) return false;
 
       if (!ok) {
