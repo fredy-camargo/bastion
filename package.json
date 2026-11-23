@@ -2,7 +2,7 @@
   "name": "bastion",
   "private": true,
   "version": "1.0.0",
-  "craft": "FA-AGY-01",
+  "craft": "FC-AGY-01",
   "description": "Bóveda criptográfica local offline con cifrado AES-256-GCM en RAM y protección visual anti-IA.",
   "type": "module",
   "scripts": {

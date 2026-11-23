@@ -1,4 +1,4 @@
-"""Generates Bastión PWA and Windows desktop PNG icons from the FA-AGY-01 design."""
+"""Generates Bastión PWA and Windows desktop PNG icons from the FC-AGY-01 design."""
 
 from pathlib import Path
 from PIL import Image, ImageDraw
@@ -89,20 +89,24 @@ def render_emblem(scale: float = 1.0, maskable: bool = False) -> Image.Image:
     draw_round_line(draw, tx(256, 320), tx(272, 320), "#F59E0B", sw(14))
     draw_round_line(draw, tx(256, 306), tx(244, 306), "#F1F5F9", sw(12))
 
-    # Camouflaged FA-AGY-01 maker's mark (Morse F ..-. + elevated Antigravity dot + A dash)
+    # Camouflaged FC-AGY-01 maker's mark (Morse F ..-. + C -.-. + elevated Antigravity dot + A dash)
     for x, y, r, color in [
-        (204, 457, 3.0, "#64748B"),
-        (216, 457, 3.0, "#64748B"),
-        (252, 457, 3.0, "#64748B"),
-        (272, 451, 3.5, "#F59E0B"),
-        (311, 457, 2.5, "#64748B"),
+        (170, 457, 2.8, "#64748B"),
+        (181, 457, 2.8, "#64748B"),
+        (212, 457, 2.8, "#64748B"),
+        (252, 457, 2.8, "#64748B"),
+        (283, 457, 2.8, "#64748B"),
+        (306, 451, 3.4, "#F59E0B"),
+        (342, 457, 2.4, "#64748B"),
     ]:
         px, py = tx(x, y)
         pr = sw(r)
         draw.ellipse([px - pr, py - pr, px + pr, py + pr], fill=color)
 
-    draw_round_line(draw, tx(226, 457), tx(242, 457), "#64748B", sw(5))
-    draw_round_line(draw, tx(283, 457), tx(301, 457), "#F59E0B", sw(5))
+    draw_round_line(draw, tx(190, 457), tx(203, 457), "#64748B", sw(4.8))
+    draw_round_line(draw, tx(230, 457), tx(243, 457), "#64748B", sw(4.8))
+    draw_round_line(draw, tx(261, 457), tx(274, 457), "#64748B", sw(4.8))
+    draw_round_line(draw, tx(316, 457), tx(332, 457), "#F59E0B", sw(4.8))
 
     return img
 

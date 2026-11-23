@@ -12,7 +12,7 @@ using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 
-[assembly: AssemblyDescription("Bastion Desktop Launcher [FA-AGY-01]")]
+[assembly: AssemblyDescription("Bastion Desktop Launcher [FC-AGY-01]")]
 
 namespace BastionDesktop
 {
