@@ -1,0 +1,826 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="referrer" content="no-referrer" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none';" />
+  <title>Bastión — Manual de Usuario y Glosario de Seguridad</title>
+  <style>
+    :root {
+      --bg-obsidian: #0A0C10;
+      --bg-graphite: #0F131A;
+      --bg-steel: #161B24;
+      --bg-steel-hover: #1C2330;
+      --border-steel: #242C3A;
+      --border-strong: #334054;
+      --text-primary: #F1F5F9;
+      --text-secondary: #94A3B8;
+      --text-muted: #64748B;
+      --accent-amber: #F59E0B;
+      --accent-amber-soft: rgba(245, 158, 11, 0.12);
+      --accent-emerald: #10B981;
+      --accent-red: #EF4444;
+      --font-display: "Outfit", "Segoe UI", system-ui, -apple-system, sans-serif;
+      --font-sans: "Public Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+      --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      background-color: var(--bg-obsidian);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      line-height: 1.65;
+    }
+
+    body {
+      margin: 0;
+      background-color: var(--bg-obsidian);
+      color: var(--text-primary);
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      height: 60px;
+      background: var(--bg-graphite);
+      border-bottom: 1px solid var(--border-steel);
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 17px;
+      color: var(--text-primary);
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .brand svg {
+      color: var(--accent-amber);
+    }
+
+    .topbar-links {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      font-size: 13px;
+    }
+
+    .topbar-links a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .topbar-links a:hover {
+      color: var(--text-primary);
+    }
+
+    .btn-print {
+      background: var(--accent-amber);
+      color: var(--bg-obsidian);
+      border: none;
+      border-radius: 6px;
+      padding: 7px 14px;
+      font-family: var(--font-sans);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .btn-print:hover {
+      background: #FBBF24;
+    }
+
+    .layout {
+      max-width: 1320px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 270px minmax(0, 1fr);
+      min-height: calc(100vh - 60px);
+    }
+
+    .sidebar {
+      border-right: 1px solid var(--border-steel);
+      background: var(--bg-graphite);
+      padding: 28px 20px;
+      position: sticky;
+      top: 60px;
+      height: calc(100vh - 60px);
+      overflow-y: auto;
+    }
+
+    .sidebar-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin: 0 0 12px 10px;
+    }
+
+    .toc {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .toc a {
+      display: block;
+      padding: 7px 10px;
+      border-radius: 6px;
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 13px;
+      transition: background 150ms ease, color 150ms ease;
+    }
+
+    .toc a:hover {
+      background: var(--bg-steel);
+      color: var(--text-primary);
+    }
+
+    .toc-divider {
+      height: 1px;
+      background: var(--border-steel);
+      margin: 14px 0;
+    }
+
+    main {
+      padding: 40px 48px 80px;
+      max-width: 920px;
+    }
+
+    .hero {
+      padding-bottom: 32px;
+      border-bottom: 1px solid var(--border-steel);
+      margin-bottom: 40px;
+    }
+
+    .kicker {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent-amber);
+      margin: 0 0 10px;
+    }
+
+    h1 {
+      font-family: var(--font-display);
+      font-size: clamp(28px, 3.5vw, 40px);
+      line-height: 1.15;
+      margin: 0 0 14px;
+      letter-spacing: -0.02em;
+    }
+
+    .lead {
+      font-size: 16px;
+      color: var(--text-secondary);
+      margin: 0 0 20px;
+      max-width: 72ch;
+    }
+
+    .meta-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    section {
+      margin-bottom: 52px;
+      scroll-margin-top: 84px;
+    }
+
+    h2 {
+      font-family: var(--font-display);
+      font-size: 24px;
+      margin: 0 0 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border-steel);
+      color: var(--text-primary);
+    }
+
+    h3 {
+      font-family: var(--font-display);
+      font-size: 17px;
+      margin: 26px 0 10px;
+      color: var(--text-primary);
+    }
+
+    p {
+      margin: 0 0 14px;
+      color: var(--text-secondary);
+      font-size: 15px;
+    }
+
+    strong {
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    ul, ol {
+      margin: 0 0 18px;
+      padding-left: 22px;
+      color: var(--text-secondary);
+      font-size: 15px;
+    }
+
+    li {
+      margin-bottom: 8px;
+    }
+
+    code {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      background: var(--bg-steel);
+      border: 1px solid var(--border-steel);
+      color: #FCD34D;
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+
+    .panel {
+      background: var(--bg-steel);
+      border: 1px solid var(--border-steel);
+      border-radius: 10px;
+      padding: 20px 22px;
+      margin: 20px 0;
+    }
+
+    .panel-title {
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin: 0 0 8px;
+    }
+
+    .panel-warning {
+      background: rgba(239, 68, 68, 0.08);
+      border-color: rgba(239, 68, 68, 0.35);
+    }
+
+    .panel-warning .panel-title {
+      color: #FCA5A5;
+    }
+
+    .panel-tip {
+      background: var(--accent-amber-soft);
+      border-color: rgba(245, 158, 11, 0.35);
+    }
+
+    .panel-tip .panel-title {
+      color: #FCD34D;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      margin: 20px 0;
+    }
+
+    .spec-box {
+      background: var(--bg-graphite);
+      border: 1px solid var(--border-steel);
+      border-radius: 8px;
+      padding: 16px 18px;
+    }
+
+    .spec-box h4 {
+      font-family: var(--font-display);
+      font-size: 14px;
+      margin: 0 0 6px;
+      color: var(--text-primary);
+    }
+
+    .spec-box p {
+      font-size: 13.5px;
+      margin: 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      font-size: 13.5px;
+      border: 1px solid var(--border-steel);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 11px 14px;
+      border-bottom: 1px solid var(--border-steel);
+      vertical-align: top;
+    }
+
+    th {
+      background: var(--bg-graphite);
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    td {
+      color: var(--text-secondary);
+      background: var(--bg-obsidian);
+    }
+
+    .mono {
+      font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
+      color: var(--text-primary);
+    }
+
+    .glossary-item {
+      padding: 18px 0;
+      border-bottom: 1px solid var(--border-steel);
+    }
+
+    .glossary-item:last-child {
+      border-bottom: none;
+    }
+
+    .glossary-term {
+      font-family: var(--font-display);
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin: 0 0 4px;
+    }
+
+    .glossary-sub {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--accent-amber);
+      margin: 0 0 8px;
+    }
+
+    .diagram {
+      background: var(--bg-graphite);
+      border: 1px solid var(--border-steel);
+      border-radius: 8px;
+      padding: 18px;
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.5;
+      color: #CBD5E1;
+      margin: 18px 0;
+    }
+
+    footer {
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border-steel);
+      font-size: 12.5px;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    @media (max-width: 960px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+      .sidebar {
+        position: static;
+        height: auto;
+        border-right: none;
+        border-bottom: 1px solid var(--border-steel);
+      }
+      main {
+        padding: 28px 20px 60px;
+      }
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+      .topbar-links {
+        display: none;
+      }
+    }
+
+    @media print {
+      .topbar, .sidebar { display: none !important; }
+      .layout { display: block; }
+      main { max-width: 100%; padding: 0; }
+      body, html { background: #ffffff; color: #0f172a; }
+      h1, h2, h3, strong, .glossary-term, .mono { color: #0f172a; }
+      p, li, td { color: #334155; }
+      .panel, .spec-box, .diagram, th, td { background: #f8fafc; border-color: #cbd5e1; color: #0f172a; }
+      code { background: #f1f5f9; color: #0f172a; border-color: #cbd5e1; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <a href="#inicio" class="brand">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      </svg>
+      <span>Bastión · Manual de Usuario</span>
+    </a>
+    <nav class="topbar-links">
+      <a href="#primeros-pasos">Primeros pasos</a>
+      <a href="#gestion-diaria">Uso diario</a>
+      <a href="#proteccion-visual">Escudo anti-IA</a>
+      <a href="#respaldos">Respaldos .bvault</a>
+      <a href="#glosario">Glosario técnico</a>
+    </nav>
+    <span class="btn-print" title="Usa Ctrl+P (Windows/Linux) o Cmd+P (macOS) para imprimir o guardar PDF">Ctrl+P · Guardar PDF</span>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <p class="sidebar-title">Contenido del manual</p>
+      <ul class="toc">
+        <li><a href="#que-es">1. Qué es Bastión y cómo te protege</a></li>
+        <li><a href="#primeros-pasos">2. Primeros pasos: crear o abrir una bóveda</a></li>
+        <li><a href="#gestion-diaria">3. Organización, búsqueda y generador</a></li>
+        <li><a href="#portapapeles">4. Portapapeles con borrado automático</a></li>
+        <li><a href="#proteccion-visual">5. Protección contra agentes de IA y lectores</a></li>
+        <li><a href="#respaldos">6. Exportar e importar archivos .bvault</a></li>
+        <li><a href="#seguridad-avanzada">7. Ajustes, rotación de clave y atajos</a></li>
+        <li><a href="#instalacion-escritorio">8. Instalar como app de escritorio offline</a></li>
+        <li class="toc-divider"></li>
+        <li><a href="#glosario">9. Glosario de criptografía y seguridad</a></li>
+        <li><a href="#preguntas">10. Preguntas frecuentes y buenas prácticas</a></li>
+      </ul>
+    </aside>
+
+    <main id="inicio">
+      <div class="hero">
+        <p class="kicker">Documentación oficial para usuarios finales</p>
+        <h1>Manual de Usuario de Bastión</h1>
+        <p class="lead">
+          Guía completa para operar tu bóveda criptográfica de contraseñas sin conexión a internet, aprovechar el escudo visual contra agentes de IA y lectores de pantalla, y comprender con claridad cada concepto técnico de seguridad.
+        </p>
+        <div class="meta-strip">
+          <span>Protocolo: AES-256-GCM</span>
+          <span>·</span>
+          <span>KDF: PBKDF2-SHA512 (600,000 iter.) + HKDF</span>
+          <span>·</span>
+          <span>Operación: 100% local sin red</span>
+        </div>
+      </div>
+
+      <!-- 1 -->
+      <section id="que-es">
+        <h2>1. Qué es Bastión y cómo te protege</h2>
+        <p>
+          <strong>Bastión</strong> es una bóveda de contraseñas diseñada para trabajar completamente desconectada de internet. A diferencia de los gestores en la nube que sincronizan tus datos con servidores remotos, Bastión mantiene cada credencial cifrada exclusivamente en tu dispositivo y deriva tu llave secreta únicamente dentro de la <strong>memoria RAM</strong> mientras la sesión está activa.
+        </p>
+
+        <div class="grid-2">
+          <div class="spec-box">
+            <h4>Clave maestra exclusiva en RAM</h4>
+            <p>Tu clave maestra nunca se guarda en disco ni en texto claro ni como hash. Cuando bloqueas la bóveda o cierras la ventana, la llave desaparece de la memoria volátil.</p>
+          </div>
+          <div class="spec-box">
+            <h4>Cero conexiones externas</h4>
+            <p>Todas las fuentes, scripts y algoritmos están empaquetados localmente. La política de seguridad del navegador impide envíos de datos hacia servidores externos.</p>
+          </div>
+          <div class="spec-box">
+            <h4>Escudo visual anti-IA y anti-lectores</h4>
+            <p>Las contraseñas reveladas jamás existen como texto seleccionable en la página: se dibujan en un lienzo gráfico aislado con interferencia anti-OCR solo mientras mantienes pulsado el botón.</p>
+          </div>
+          <div class="spec-box">
+            <h4>Portapapeles autodestructivo</h4>
+            <p>Cada vez que copias una contraseña, un temporizador configurable borra y sobrescribe el portapapeles automáticamente al vencer el plazo.</p>
+          </div>
+        </div>
+
+        <pre class="diagram">Tu Clave Maestra (solo en tu mente)
+        │
+        ▼  [PBKDF2-SHA512 · 600,000 iteraciones + HKDF]
+Llave AES-256-GCM no extraíble (reside ÚNICAMENTE en RAM)
+        │
+        ├──► Descifra tus contraseñas en pantalla (Canvas aislado sin texto DOM)
+        ├──► Cifra cambios hacia IndexedDB local (solo texto cifrado ininteligible)
+        └──► Genera archivos .bvault portables para respaldo o traslado seguro</pre>
+      </section>
+
+      <!-- 2 -->
+      <section id="primeros-pasos">
+        <h2>2. Primeros pasos: crear o abrir una bóveda</h2>
+        <p>Al abrir Bastión por primera vez verás la <strong>Pantalla de Acceso Táctico</strong> con tres modos de operación:</p>
+
+        <h3>Crear una bóveda nueva</h3>
+        <ol>
+          <li>Selecciona la pestaña <strong>Crear bóveda</strong>.</li>
+          <li>Define una <strong>clave maestra única</strong> de al menos 10 caracteres. Observa el medidor de <strong>entropía en bits</strong>: busca superar los 80 bits combinando palabras poco comunes, números y símbolos.</li>
+          <li>Si sospechas que el entorno podría capturar tus pulsaciones de teclado, activa el botón <strong>Teclado seguro</strong> para escribir haciendo clic sobre teclas barajadas aleatoriamente.</li>
+          <li>Decide si quieres activar el <strong>Modo efímero puro</strong>:
+            <ul>
+              <li><em>Desactivado (recomendado para uso diario):</em> Bastión guarda el bloque <strong>ya cifrado</strong> en el almacenamiento local IndexedDB del navegador, de modo que al volver a abrir la app solo tendrás que escribir tu clave maestra.</li>
+              <li><em>Activado (máxima volatilidad):</em> Nada se guarda en IndexedDB. Todo vive únicamente en RAM durante la sesión y deberás exportar un archivo <code>.bvault</code> antes de cerrar.</li>
+            </ul>
+          </li>
+          <li>Pulsa <strong>Inicializar bóveda cifrada</strong>. El cálculo inicial tarda una fracción de segundo porque ejecuta 600,000 rondas criptográficas para resistir ataques de fuerza bruta.</li>
+        </ol>
+
+        <div class="panel panel-warning">
+          <p class="panel-title">Importante: sin recuperación remota de clave maestra</p>
+          <p style="margin:0;">
+            Porque Bastión no tiene servidores ni almacena copias de tu clave maestra, <strong>nadie puede restablecerla si la olvidas</strong>. Sin la clave maestra exacta, los datos cifrados en IndexedDB y en los archivos <code>.bvault</code> son matemáticamente irrecuperables. Memorízala o consérvala en un medio físico seguro (por ejemplo, papel guardado bajo llave).
+          </p>
+        </div>
+
+        <h3>Desbloquear una bóveda existente o abrir un archivo .bvault</h3>
+        <ul>
+          <li><strong>Desbloquear bóveda:</strong> Cuando ya existe una bóveda cifrada local, introduce tu clave maestra y pulsa <strong>Desbloquear bóveda</strong>. Si la clave es incorrecta o el bloque fue alterado, la verificación AEAD rechazará el acceso inmediatamente.</li>
+          <li><strong>Abrir archivo .bvault:</strong> Pulsa <strong>Abrir archivo .bvault</strong> en la barra superior o cambia a la pestaña <strong>Importar .bvault</strong>, selecciona el archivo desde tu equipo, escribe su clave de descifrado y elige si deseas conservar el bloque cifrado localmente o abrirlo solo en RAM.</li>
+        </ul>
+      </section>
+
+      <!-- 3 -->
+      <section id="gestion-diaria">
+        <h2>3. Organización, búsqueda y generador de contraseñas</h2>
+        <p>Una vez desbloqueada la bóveda, la interfaz de escritorio se organiza en tres áreas claras:</p>
+        <ul>
+          <li><strong>Barra lateral izquierda (Categorías):</strong> Filtra entre <em>Todas las credenciales</em>, <em>Favoritas</em> o cualquiera de las categorías predefinidas (<em>Bancos y Finanzas</em>, <em>Trabajo y Corporativo</em>, <em>Correo Electrónico</em>, <em>Servidores y SSH</em>, <em>Cuentas Personales</em>, <em>Notas y Claves API</em>). Puedes crear categorías personalizadas con el botón <strong>Nueva</strong> y eliminar las que hayas añadido.</li>
+          <li><strong>Tabla central (Registros):</strong> Permite buscar instantáneamente en memoria RAM por título, usuario o dirección, ordenar por <em>Más recientes</em>, <em>Alfabético (A–Z)</em> o <em>Menor entropía primero</em> (útil para detectar y reforzar contraseñas débiles).</li>
+          <li><strong>Inspector derecho (Detalle y edición):</strong> Al hacer clic en cualquier fila, muestra el usuario, el visor protegido en Canvas para la contraseña y notas secretas, el indicador de entropía y las opciones para editar o eliminar.</li>
+        </ul>
+
+        <h3>Crear o editar una credencial</h3>
+        <ol>
+          <li>Pulsa <strong>Nueva credencial</strong> en la barra de herramientas (o <strong>Editar</strong> en una credencial existente).</li>
+          <li>Completa el título del servicio, categoría, usuario/correo, contraseña, dirección/host opcional y notas seguras (como códigos de recuperación o claves API).</li>
+          <li>Usa el botón <strong>Generar</strong> junto al campo de contraseña para abrir el <strong>Generador criptográfico CSPRNG</strong>, elegir longitud (12 a 64 caracteres) y tipos de caracteres, y aplicarla directamente.</li>
+          <li>Al pulsar <strong>Guardar credencial</strong>, toda la bóveda se vuelve a cifrar instantáneamente en RAM con un nuevo vector IV aleatorio.</li>
+        </ol>
+      </section>
+
+      <!-- 4 -->
+      <section id="portapapeles">
+        <h2>4. Portapapeles con borrado automático</h2>
+        <p>
+          Copiar contraseñas al portapapeles del sistema operativo es cómodo, pero dejar una contraseña copiada indefinidamente permite que otras aplicaciones o una pegada accidental la expongan.
+        </p>
+        <ol>
+          <li>Haz clic en <strong>Copiar</strong> en cualquier fila de la tabla o en <strong>Copiar contraseña</strong> dentro del inspector derecho.</li>
+          <li>Aparecerá una barra de color ámbar en la parte superior del listado mostrando el elemento copiado y una cuenta regresiva en vivo (por defecto <strong>30 segundos</strong>, configurable a 15, 30 o 60 segundos en <em>Seguridad</em>).</li>
+          <li>Pega la contraseña donde la necesites. Cuando el contador llega a <code>0 s</code> —o cuando pulsas <strong>Purgar ahora</strong> o <strong>Bloquear bóveda</strong>— Bastión sobrescribe automáticamente el portapapeles con texto vacío para eliminar el rastro.</li>
+        </ol>
+      </section>
+
+      <!-- 5 -->
+      <section id="proteccion-visual">
+        <h2>5. Protección contra agentes de IA y lectores de pantalla</h2>
+        <p>
+          Muchos agentes automatizados, extensiones del navegador y lectores de pantalla extraen datos inspeccionando el texto del documento HTML (el DOM) o tomando capturas periódicas para aplicar reconocimiento óptico de caracteres (OCR). Bastión combina cuatro defensas complementarias:
+        </p>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Mecanismo</th>
+              <th>Cómo se usa</th>
+              <th>Qué amenaza mitiga</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Visor Canvas aislado</strong></td>
+              <td>Mantén pulsado el botón <strong>Mantener para revelar</strong> (con ratón o barra espaciadora). Al soltarlo, el lienzo se borra de inmediato.</td>
+              <td>Evita nodos de texto en el DOM y bloquea el árbol de accesibilidad (<code>aria-hidden="true"</code>) frente a lectores de pantalla y agentes basados en DOM.</td>
+            </tr>
+            <tr>
+              <td><strong>Ruido dinámico Anti-OCR</strong></td>
+              <td>Configurable en <em>Seguridad</em> entre nivel <strong>Estándar</strong> y <strong>Alto</strong>.</td>
+              <td>Aplica micro-desplazamiento aleatorio por carácter, diferenciación cromática y líneas de interferencia refrescadas cada 320 ms para dificultar la extracción por modelos de visión / OCR.</td>
+            </tr>
+            <tr>
+              <td><strong>Teclado virtual aleatorio</strong></td>
+              <td>Disponible al desbloquear, crear bóveda o editar contraseñas mediante el botón <strong>Teclado seguro</strong>. Incluye opción <em>Reordenar tras pulsar</em>.</td>
+              <td>Impide la captura de eventos de teclado físico y frustra el rastreo por coordenadas fijas del ratón.</td>
+            </tr>
+            <tr>
+              <td><strong>Cortina de privacidad</strong></td>
+              <td>Pulsa <strong>Escudo de pantalla</strong> en la barra lateral o el atajo <code>Ctrl + Shift + P</code>. También se activa automáticamente al cambiar de pestaña.</td>
+              <td>Cubre inmediatamente toda la interfaz frente a miradas indiscretas o capturas en segundo plano.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="panel panel-tip">
+          <p class="panel-title">Consejo de lectura en el visor Canvas</p>
+          <p style="margin:0;">
+            Para ayudarte a distinguir caracteres parecidos mientras mantienes pulsado <strong>Mantener para revelar</strong>, Bastión pinta las letras en <strong>blanco titanio</strong>, los números en <strong>ámbar</strong> y los símbolos en <strong>azul acero</strong>.
+          </p>
+        </div>
+      </section>
+
+      <!-- 6 -->
+      <section id="respaldos">
+        <h2>6. Exportar e importar archivos .bvault</h2>
+        <p>
+          Para trasladar tus contraseñas a otro equipo o mantener copias de seguridad en una memoria USB cifrada, utiliza la sección <strong>Respaldo .bvault</strong> en la barra superior.
+        </p>
+
+        <h3>Exportar un respaldo cifrado (.bvault)</h3>
+        <ol>
+          <li>Elige el ámbito: <strong>Toda la bóveda</strong> o una <strong>categoría específica</strong>.</li>
+          <li>Selecciona la clave de cifrado del archivo:
+            <ul>
+              <li><strong>Clave maestra en RAM:</strong> Cifra el archivo usando tu llave maestra actual con un vector IV nuevo generado por CSPRNG.</li>
+              <li><strong>Clave de respaldo dedicada:</strong> Permite escribir una frase independiente (mínimo 10 caracteres) y genera una sal nueva de 256 bits, ideal si vas a compartir una categoría concreta o archivar el respaldo aparte.</li>
+            </ul>
+          </li>
+          <li>Pulsa <strong>Descargar archivo .bvault</strong>. El archivo se genera localmente en tu navegador sin enviarse a ningún servidor.</li>
+        </ol>
+
+        <h3>Importar un archivo .bvault</h3>
+        <ol>
+          <li>Cambia a la pestaña <strong>Importar .bvault</strong> y selecciona el archivo local.</li>
+          <li>Introduce la clave con la que fue cifrado y pulsa <strong>Descifrar y previsualizar</strong>.</li>
+          <li>Bastión valida la firma autenticada AEAD en RAM y te muestra cuántas credenciales, categorías y coincidencias contiene.</li>
+          <li>Elige cómo fusionar los datos: <strong>Fusionar y conservar ambos</strong> (evita sobrescrituras), <strong>Fusionar y actualizar existentes</strong> o <strong>Reemplazar bóveda completa</strong>.</li>
+        </ol>
+      </section>
+
+      <!-- 7 -->
+      <section id="seguridad-avanzada">
+        <h2>7. Ajustes de seguridad, rotación de clave y atajos</h2>
+        <p>Abre <strong>Seguridad</strong> desde la barra superior para personalizar el comportamiento defensivo de la bóveda:</p>
+        <ul>
+          <li><strong>Autoborrado del portapapeles:</strong> 15, 30 o 60 segundos.</li>
+          <li><strong>Bloqueo por inactividad:</strong> 1, 3, 5 o 15 minutos sin interacción. Al expirar, la llave se destruye de la RAM y vuelves a la pantalla de acceso.</li>
+          <li><strong>Nivel anti-OCR:</strong> <em>Estándar</em> (lectura más limpia) o <em>Alto</em> (interferencia máxima contra agentes de visión).</li>
+          <li><strong>Bloquear al cambiar de pestaña o ventana:</strong> Si se activa, perder el foco no solo muestra la cortina, sino que purga inmediatamente la RAM y exige nuevamente la clave maestra.</li>
+          <li><strong>Rotar clave maestra:</strong> Genera una nueva sal de 256 bits, deriva una llave nueva en RAM y re-cifra toda la bóveda sin perder tus credenciales.</li>
+        </ul>
+
+        <h3>Atajos de teclado rápidos</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Atajo</th>
+              <th>Acción</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="mono">Ctrl + Shift + L</td>
+              <td>Bloqueo táctico inmediato: limpia la clave de la RAM y purga el portapapeles.</td>
+            </tr>
+            <tr>
+              <td class="mono">Ctrl + Shift + P</td>
+              <td>Activa o desactiva manualmente la Cortina de privacidad sobre toda la ventana.</td>
+            </tr>
+            <tr>
+              <td class="mono">Espacio / Enter (en botón revelar)</td>
+              <td>Mantiene visible la contraseña en el Canvas mientras la tecla permanezca presionada.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- 8 -->
+      <section id="instalacion-escritorio">
+        <h2>8. Instalar Bastión como aplicación de escritorio offline</h2>
+        <p>
+          Bastión funciona como una <strong>Aplicación Web Progresiva (PWA)</strong> con precacheo completo. Puedes instalarla para abrirla en su propia ventana independiente sin barra de direcciones y utilizarla incluso con el Wi-Fi o cable de red completamente desconectados:
+        </p>
+        <ul>
+          <li><strong>En Chrome, Edge o Brave (Windows, macOS, Linux):</strong> Pulsa el botón <strong>Instalar app de escritorio</strong> ubicado en la barra lateral izquierda o en la pantalla de bloqueo (o usa el icono de instalación en la barra de direcciones del navegador).</li>
+          <li><strong>En iPhone / iPad (Safari):</strong> Pulsa <strong>Instalar sin conexión</strong> para seguir los pasos de <em>Compartir → Añadir a pantalla de inicio</em>.</li>
+        </ul>
+      </section>
+
+      <!-- 9 -->
+      <section id="glosario">
+        <h2>9. Glosario de terminología de seguridad y criptografía</h2>
+        <p>
+          A continuación se explican en lenguaje claro todos los términos técnicos que verás en Bastión y en la industria de la ciberseguridad.
+        </p>
+
+        <div class="glossary-item">
+          <p class="glossary-term">AES-256-GCM</p>
+          <p class="glossary-sub">Advanced Encryption Standard · Clave de 256 bits · Galois/Counter Mode</p>
+          <p>Es el estándar internacional de cifrado simétrico adoptado por organismos gubernamentales y financieros (frecuentemente llamado "cifrado de grado militar"). Utiliza una clave de 256 bits (2<sup>256</sup> combinaciones posibles, imposible de agotar por fuerza bruta) y el modo <strong>GCM</strong> añade autenticación automática para garantizar que nadie haya modificado ni un solo bit del archivo cifrado.</p>
+        </div>
+
+        <div class="glossary-item">
+          <p class="glossary-term">AEAD y Etiqueta de Autenticación (128 bits)</p>
+          <p class="glossary-sub">Authenticated Encryption with Associated Data</p>
+          <p>Un cifrado autenticado produce, además del texto cifrado, una firma criptográfica de 128 bits (etiqueta GCM). Al intentar descifrar, el motor recalcula esa firma: si la clave maestra es incorrecta o alguien alteró el archivo <code>.bvault</code>, el descifrado falla al instante en lugar de mostrar datos corruptos.</p>
+        </div>
+
+        <div class="glossary-item">
+          <p class="glossary-term">AAD (Datos Autenticados Adicionales)</p>
+          <p class="glossary-sub">Additional Authenticated Data</p>
+          <p>Son los metadatos de cabecera del sobre cifrado (versión del protocolo, algoritmo, número de iteraciones, sal y ámbito). Aunque no están cifrados para poder leer cómo derivar la llave, están protegidos criptográficamente por la etiqueta GCM: si un atacante intenta rebajar el número de iteraciones editando el archivo, la verificación falla.</p>
+        </div>
+
+        <div class="glossary-item">
+          <p class="glossary-term">PBKDF2-HMAC-SHA512 (600,000 iteraciones)</p>
+          <p class="glossary-sub">Password-Based Key Derivation Function 2</p>
+          <p>Las contraseñas humanas no sirven directamente como llaves criptográficas. PBKDF2 transforma tu frase maestra en una llave matemática repitiendo la función criptográfica SHA-512 <strong>600,000 veces</strong>. Para ti solo supone una fracción de segundo al desbloquear, pero para un atacante que intenta probar millones de contraseñas por segundo multiplica el coste computacional por 600,000.</p>
+        </div>
+
+        <div class="glossary-item">
+          <p class="glossary-term">HKDF-SHA512 (Separación de dominio)</p>
+          <p class="glossary-sub">HMAC-based Extract-and-Expand Key Derivation Function</p>
+          <p>Segunda fase de derivación que toma el material generado por PBKDF2 y lo expande vinculándolo a un identificador único de contexto de Bastión (<code>BASTION-VAULT-AES256GCM-KEY-V1</code>), produciendo una llave final criptográficamente uniforme y exclusiva para esta aplicación.</p>
+        </div>
+
+        <div class="glossary-item">
+          <p class="glossary-term">Sal criptográfica (Salt de 256 bits)</p>
+          <p class="glossary-sub">Valor aleatorio único por bóveda o respaldo</p>
+          <p>Es una cadena de 32 bytes completamente aleatorios que se mezcla con tu clave maestra antes de derivar la llave. Garantiza que, incluso si dos personas eligieran exactamente la misma contraseña maestra, sus llaves resultantes y sus archivos cifrados serían totalmente distintos, inutilizando las tablas precalculadas (<em>rainbow tables</em>).</p>
+        </div>
+
+        <div class="glossary-item">
+          <p class="glossary-term">IV / Nonce (Vector de Inicialización de 96 bits)</p>
+          <p class="glossary-sub">Number used once · 12 bytes CSPRNG</p>
+          <p>Valor aleatorio fresco que se genera cada vez que se cifra la bóveda o se exporta un archivo. Evita que guardar los mismos datos dos veces produzca el mismo bloque cifrado y es un requisito matemático crítico para la seguridad de AES-GCM.</p>
+        </div>
+
+        <div class="glossary-item">
+          <p class="glossary-term">Clave no extraíble (<code>extractable: false</code>) y RAM volátil</p>
+          <p class="glossary-sub">Aislamiento en memoria de trabajo del motor criptográfico</p>
+          <p>La memoria RAM es la memoria temporal que se borra al cerrar la aplicación o apagar el equipo. Al marcar la llave como <code>extractable: false</code> en la Web Crypto API, ni siquiera el propio código JavaScript puede leer o exportar los bytes crudos de la llave maestra; solo puede pedirle al motor nativo que cifre o descifre mientras la sesión esté abierta.</p>
+        </div>
+
+        <div class="glossary-item">
+          <p class="glossary-term">IndexedDB vs. Modo Efímero</p>
+          <p class="glossary-sub">Persistencia local cifrada frente a sesión volátil pura</p>
+          <p><strong>IndexedDB</strong> es una base de datos local dentro de tu equipo donde Bastión guarda únicamente el bloque <em>ya cifrado</em> (sin clave). El <strong>Modo Efímero</strong> desactiva incluso esa escritura local para que toda la sesión viva exclusivamente en memoria RAM.</p>
+        </div>
+
+        <div class="glossary-item">
+          <p class="glossary-term">CSPRNG y eliminación del sesgo de módulo</p>
+          <p class="glossary-sub">Cryptographically Secure Pseudo-Random Number Generator</p>
+          <p>Generador de números aleatorios de grado criptográfico del sistema operativo (<code>crypto.getRandomValues</code>), muy superior al <code>Math.random()</code> común que es predecible. Bastión aplica además <em>rejection sampling</em> para asegurar que cada carácter del generador tenga exactamente la misma probabilidad estadística.</p>
+        </div>
+
+        <div class="glossary-item">
+          <p class="glossary-term">Entropía en bits</p>
+          <p class="glossary-sub">Medida matemática de imprevisibilidad</p>
+          <p>Indica cuán difícil es adivinar una contraseña. Cada bit adicional duplica el esfuerzo necesario para descifrarla. Una clave de 40 bits es vulnerable; a partir de 80 bits se considera fuerte y por encima de 110 bits ofrece resistencia de grado militar frente a ataques modernos.</p>
+        </div>
+
+        <div class="glossary-item">
+          <p class="glossary-term">DOM, Árbol de Accesibilidad y Lectores de Pantalla</p>
+          <p class="glossary-sub">Document Object Model</p>
+          <p>El DOM es la estructura interna de etiquetas y texto que el navegador construye para mostrar una página. Las extensiones maliciosas, los lectores de pantalla y muchos agentes de IA leen directamente ese texto del DOM. Al renderizar las contraseñas en un elemento <code>&lt;canvas aria-hidden="true"&gt;</code>, la contraseña nunca existe como texto en el DOM.</p>
+        </div>
+
+        <div class="glossary-item">
+          <p class="glossary-term">OCR y Agentes de Visión por IA</p>
+          <p class="glossary-sub">Optical Character Recognition</p>
+          <p>Tecnología capaz de tomar una captura de pantalla y convertir píxeles en texto. Bastión contrarresta esto mostrando la clave solo mientras mantienes pulsado el botón, introduciendo ruido visual aleatorio, micro-inclinación por carácter y cubriendo la ventana al perder el foco.</p>
+        </div>
+
+        <div class="glossary-item">
+          <p class="glossary-term">CSP (Política de Seguridad de Contenidos) y PWA</p>
+          <p class="glossary-sub">Content-Security-Policy · Progressive Web App</p>
+          <p>La <strong>CSP</strong> es una regla estricta que ordena al navegador bloquear conexiones a servidores externos (<code>connect-src 'self'</code>) y objetos embebidos peligrosos. La arquitectura <strong>PWA</strong> emplea un <em>Service Worker</em> local para almacenar los archivos de la interfaz en caché y permitir que Bastión arranque y funcione sin internet.</p>
+        </div>
+      </section>
+
+      <!-- 10 -->
+      <section id="preguntas">
+        <h2>10. Preguntas frecuentes y buenas prácticas</h2>
+        <h3>¿Qué ocurre si cierro el navegador sin pulsar "Bloquear bóveda"?</h3>
+        <p>La memoria RAM de la pestaña se libera inmediatamente al cerrarse y la clave maestra desaparece. Al volver a abrir Bastión siempre se solicitará de nuevo tu clave maestra.</p>
+
+        <h3>¿Con qué frecuencia debo exportar un archivo .bvault?</h3>
+        <p>Si utilizas el almacenamiento local cifrado en IndexedDB, recuerda que limpiar los datos de navegación del navegador borraría ese almacenamiento. Exporta un archivo <code>.bvault</code> cada vez que añadas credenciales críticas y consérvalo en al menos dos soportes físicos independientes (por ejemplo, disco local y memoria USB).</p>
+
+        <h3>¿Puedo usar Bastión en un ordenador completamente desconectado (air-gapped)?</h3>
+        <p>Sí. Una vez instalada como PWA o servida desde una carpeta local en el equipo, Bastión no necesita ningún acceso a internet para derivar llaves, cifrar, generar contraseñas ni exportar o importar archivos <code>.bvault</code>.</p>
+      </section>
+
+      <footer>
+        <span>Bastión — Bóveda Criptográfica Local Sin Conexión</span>
+        <span>Manual de Usuario · Documento autónomo offline</span>
+      </footer>
+    </main>
+  </div>
+</body>
+</html>

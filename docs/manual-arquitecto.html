@@ -1,0 +1,863 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="referrer" content="no-referrer" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none';" />
+  <title>Bastión — Manual de Arquitecto y Despliegue en Producción</title>
+  <style>
+    :root {
+      --bg-obsidian: #0A0C10;
+      --bg-graphite: #0F131A;
+      --bg-steel: #161B24;
+      --bg-steel-hover: #1C2330;
+      --border-steel: #242C3A;
+      --border-strong: #334054;
+      --text-primary: #F1F5F9;
+      --text-secondary: #94A3B8;
+      --text-muted: #64748B;
+      --accent-amber: #F59E0B;
+      --accent-amber-soft: rgba(245, 158, 11, 0.12);
+      --accent-emerald: #10B981;
+      --accent-sky: #38BDF8;
+      --accent-red: #EF4444;
+      --font-display: "Outfit", "Segoe UI", system-ui, -apple-system, sans-serif;
+      --font-sans: "Public Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+      --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+      background-color: var(--bg-obsidian);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      line-height: 1.65;
+    }
+
+    body {
+      margin: 0;
+      background-color: var(--bg-obsidian);
+      color: var(--text-primary);
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      height: 60px;
+      background: var(--bg-graphite);
+      border-bottom: 1px solid var(--border-steel);
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 17px;
+      color: var(--text-primary);
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .brand svg { color: var(--accent-amber); }
+
+    .topbar-links {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      font-size: 13px;
+    }
+
+    .topbar-links a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .topbar-links a:hover { color: var(--text-primary); }
+
+    .btn-print {
+      background: var(--accent-amber);
+      color: var(--bg-obsidian);
+      border: none;
+      border-radius: 6px;
+      padding: 7px 14px;
+      font-family: var(--font-sans);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .btn-print:hover { background: #FBBF24; }
+
+    .layout {
+      max-width: 1360px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      min-height: calc(100vh - 60px);
+    }
+
+    .sidebar {
+      border-right: 1px solid var(--border-steel);
+      background: var(--bg-graphite);
+      padding: 28px 20px;
+      position: sticky;
+      top: 60px;
+      height: calc(100vh - 60px);
+      overflow-y: auto;
+    }
+
+    .sidebar-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin: 0 0 12px 10px;
+    }
+
+    .toc {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .toc a {
+      display: block;
+      padding: 7px 10px;
+      border-radius: 6px;
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 13px;
+      transition: background 150ms ease, color 150ms ease;
+    }
+
+    .toc a:hover {
+      background: var(--bg-steel);
+      color: var(--text-primary);
+    }
+
+    .toc-divider {
+      height: 1px;
+      background: var(--border-steel);
+      margin: 14px 0;
+    }
+
+    main {
+      padding: 40px 48px 80px;
+      max-width: 960px;
+    }
+
+    .hero {
+      padding-bottom: 32px;
+      border-bottom: 1px solid var(--border-steel);
+      margin-bottom: 40px;
+    }
+
+    .kicker {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent-amber);
+      margin: 0 0 10px;
+    }
+
+    h1 {
+      font-family: var(--font-display);
+      font-size: clamp(28px, 3.5vw, 40px);
+      line-height: 1.15;
+      margin: 0 0 14px;
+      letter-spacing: -0.02em;
+    }
+
+    .lead {
+      font-size: 16px;
+      color: var(--text-secondary);
+      margin: 0 0 20px;
+      max-width: 74ch;
+    }
+
+    .meta-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    section {
+      margin-bottom: 56px;
+      scroll-margin-top: 84px;
+    }
+
+    h2 {
+      font-family: var(--font-display);
+      font-size: 24px;
+      margin: 0 0 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border-steel);
+      color: var(--text-primary);
+    }
+
+    h3 {
+      font-family: var(--font-display);
+      font-size: 17px;
+      margin: 28px 0 10px;
+      color: var(--text-primary);
+    }
+
+    p {
+      margin: 0 0 14px;
+      color: var(--text-secondary);
+      font-size: 15px;
+    }
+
+    strong { color: var(--text-primary); font-weight: 600; }
+
+    ul, ol {
+      margin: 0 0 18px;
+      padding-left: 22px;
+      color: var(--text-secondary);
+      font-size: 14.5px;
+    }
+
+    li { margin-bottom: 8px; }
+
+    code {
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      background: var(--bg-steel);
+      border: 1px solid var(--border-steel);
+      color: #FCD34D;
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+
+    pre {
+      background: var(--bg-graphite);
+      border: 1px solid var(--border-steel);
+      border-radius: 8px;
+      padding: 18px 20px;
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      line-height: 1.55;
+      color: #E2E8F0;
+      margin: 16px 0 22px;
+    }
+
+    pre code {
+      background: transparent;
+      border: none;
+      padding: 0;
+      color: inherit;
+      font-size: inherit;
+    }
+
+    .panel {
+      background: var(--bg-steel);
+      border: 1px solid var(--border-steel);
+      border-radius: 10px;
+      padding: 20px 22px;
+      margin: 20px 0;
+    }
+
+    .panel-title {
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin: 0 0 8px;
+    }
+
+    .panel-amber {
+      background: var(--accent-amber-soft);
+      border-color: rgba(245, 158, 11, 0.35);
+    }
+
+    .panel-amber .panel-title { color: #FCD34D; }
+
+    .panel-danger {
+      background: rgba(239, 68, 68, 0.08);
+      border-color: rgba(239, 68, 68, 0.35);
+    }
+
+    .panel-danger .panel-title { color: #FCA5A5; }
+
+    .module-card {
+      background: var(--bg-graphite);
+      border: 1px solid var(--border-steel);
+      border-radius: 8px;
+      padding: 18px 20px;
+      margin: 16px 0;
+    }
+
+    .module-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border-steel);
+    }
+
+    .module-path {
+      font-family: var(--font-mono);
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--accent-amber);
+    }
+
+    .module-role {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      font-size: 13.5px;
+      border: 1px solid var(--border-steel);
+    }
+
+    th, td {
+      text-align: left;
+      padding: 11px 14px;
+      border-bottom: 1px solid var(--border-steel);
+      vertical-align: top;
+    }
+
+    th {
+      background: var(--bg-graphite);
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    td {
+      color: var(--text-secondary);
+      background: var(--bg-obsidian);
+    }
+
+    .mono {
+      font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
+      color: var(--text-primary);
+    }
+
+    .check-list {
+      list-style: none;
+      padding: 0;
+      margin: 16px 0;
+    }
+
+    .check-list li {
+      padding: 10px 14px;
+      border: 1px solid var(--border-steel);
+      background: var(--bg-graphite);
+      border-radius: 6px;
+      margin-bottom: 8px;
+      font-size: 13.5px;
+    }
+
+    footer {
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border-steel);
+      font-size: 12.5px;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    @media (max-width: 960px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar {
+        position: static;
+        height: auto;
+        border-right: none;
+        border-bottom: 1px solid var(--border-steel);
+      }
+      main { padding: 28px 20px 60px; }
+      .topbar-links { display: none; }
+    }
+
+    @media print {
+      .topbar, .sidebar { display: none !important; }
+      .layout { display: block; }
+      main { max-width: 100%; padding: 0; }
+      body, html { background: #ffffff; color: #0f172a; }
+      h1, h2, h3, strong, .mono, .module-path { color: #0f172a; }
+      p, li, td { color: #334155; }
+      pre, .panel, .module-card, .check-list li, th, td {
+        background: #f8fafc;
+        border-color: #cbd5e1;
+        color: #0f172a;
+      }
+      code { background: #f1f5f9; color: #0f172a; border-color: #cbd5e1; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <a href="#inicio" class="brand">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      </svg>
+      <span>Bastión · Manual de Arquitecto</span>
+    </a>
+    <nav class="topbar-links">
+      <a href="#arquitectura">Arquitectura</a>
+      <a href="#criptografia">Motor Cripto</a>
+      <a href="#modulos">Anatomía del Código</a>
+      <a href="#decisiones">Decisiones (ADRs)</a>
+      <a href="#produccion">Instalación y Producción</a>
+    </nav>
+    <span class="btn-print" title="Usa Ctrl+P (Windows/Linux) o Cmd+P (macOS) para imprimir o guardar PDF">Ctrl+P · Guardar PDF</span>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <p class="sidebar-title">Índice técnico</p>
+      <ul class="toc">
+        <li><a href="#arquitectura">1. Visión general y topología</a></li>
+        <li><a href="#criptografia">2. Diseño del protocolo criptográfico</a></li>
+        <li><a href="#modelo-datos">3. Modelo de datos y formato .bvault</a></li>
+        <li><a href="#modulos">4. Anatomía detallada del código</a></li>
+        <li><a href="#anti-intercepcion">5. Ingeniería anti-IA y anti-lectores</a></li>
+        <li><a href="#decisiones">6. Decisiones de arquitectura y alternativas (ADRs)</a></li>
+        <li><a href="#modelo-amenazas">7. Modelo de amenazas y límites reales</a></li>
+        <li class="toc-divider"></li>
+        <li><a href="#produccion">8. Descarga, instalación y puesta en producción</a></li>
+        <li><a href="#auditoria">9. Lista de verificación pre-producción</a></li>
+      </ul>
+    </aside>
+
+    <main id="inicio">
+      <div class="hero">
+        <p class="kicker">Referencia de ingeniería, criptografía y despliegue</p>
+        <h1>Manual de Arquitecto de Bastión</h1>
+        <p class="lead">
+          Especificación técnica exhaustiva de la arquitectura cliente-puro offline, el pipeline criptográfico sobre Web Crypto API, el desglose módulo por módulo del código fuente, la justificación de decisiones frente a arquitecturas alternativas y la guía operativa para instalar y desplegar Bastión en producción.
+        </p>
+        <div class="meta-strip">
+          <span>Stack: React 19 + TypeScript 7 + Vite 8 + Tailwind v4</span>
+          <span>·</span>
+          <span>Crypto: Web Crypto API nativa</span>
+          <span>·</span>
+          <span>Offline: Workbox PWA + CSP estricta</span>
+        </div>
+      </div>
+
+      <!-- 1 -->
+      <section id="arquitectura">
+        <h2>1. Visión general y topología del sistema</h2>
+        <p>
+          Bastión implementa una arquitectura <strong>Zero-Network, Zero-Knowledge, Client-Only</strong>. No existe backend de negocio, base de datos remota, telemetría ni dependencia de CDNs externas en tiempo de ejecución. Toda la superficie de ataque de red se reduce a servir activos estáticos inmutables una única vez para su precacheo mediante Service Worker.
+        </p>
+
+        <pre><code>┌─────────────────────────────────────────────────────────────────────────────┐
+│                    PERÍMETRO OFFLINE Y POLÍTICA CSP                         │
+│  index.html (connect-src 'self'; object-src 'none')                         │
+│  vite-plugin-pwa (Workbox Precache) · @fontsource/* empaquetados localmente │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │
+┌──────────────────────────────────────▼──────────────────────────────────────┐
+│               CAPA DE ORQUESTACIÓN Y SESIÓN VOLÁTIL (src/App.tsx)           │
+│  RamVaultSession { key: CryptoKey(extractable=false), payload, saltB64 }    │
+│  · Auto-bloqueo por inactividad · Purga en Lock/Blur/BeforeUnload           │
+│  · Enrutado de filtros/búsqueda en RAM · Mutaciones CRUD -> Re-cifrado      │
+└───────┬──────────────────────────────┬───────────────────────────────┬──────┘
+        │                              │                               │
+        ▼                              ▼                               ▼
+┌─────────────────────┐    ┌───────────────────────┐    ┌─────────────────────┐
+│   MOTOR CRIPTO      │    │   CAPA ANTI-IA / UI   │    │  GUARDIÁN SISTEMA   │
+│ src/crypto/engine   │    │ CanvasSecretViewer    │    │ useClipboardGuard   │
+│ · PBKDF2-SHA512 600k│    │ · Cero texto en DOM   │    │ · Temporizador      │
+│ · HKDF-SHA512       │    │ · Ruido anti-OCR      │    │ · Sobrescritura ''  │
+│ · AES-256-GCM + AAD │    │ · Hold-to-Reveal      │    │ usePWAInstall       │
+│ · CSPRNG sin sesgo  │    │ SecureVirtualKeypad   │    │ · Standalone PWA    │
+└──────────┬──────────┘    │ PrivacyCurtainOverlay │    └─────────────────────┘
+           │               └───────────────────────┘
+           │ Solo Ciphertext (EncryptedVaultEnvelope)
+           ▼
+┌─────────────────────┐    ┌───────────────────────┐
+│  INDEXEDDB LOCAL    │    │   EXPORT / IMPORT     │
+│ src/storage/        │    │ ExportImportModal     │
+│ bastion_encrypted_  │    │ · Blob local .bvault  │
+│ vault_db (solo blob │    │ · FileReader local    │
+│ cifrado opcional)   │    │ · Fusión de conflictos│
+└─────────────────────┘    └───────────────────────┘</code></pre>
+
+        <h3>Separación estricta de fronteras de confianza</h3>
+        <ul>
+          <li><strong>Frontera Volátil (RAM):</strong> Contiene exclusivamente <code>RamVaultSession</code> (referencia a <code>CryptoKey</code> no extraíble + arreglo <code>VaultEntry[]</code> descifrado). Al llamar a <code>lockVault()</code>, el estado de React se establece en <code>null</code>, se purga el portapapeles y se desmontan todos los componentes con datos sensibles.</li>
+          <li><strong>Frontera Persistente (Disco / IndexedDB / Archivos <code>.bvault</code>):</strong> Jamás recibe texto plano ni llaves derivadas. Únicamente almacena objetos <code>EncryptedVaultEnvelope</code> autenticados con etiqueta GCM de 128 bits.</li>
+          <li><strong>Frontera Visual (DOM vs. Canvas):</strong> Los secretos nunca se montan como nodos de texto visibles ni en <code>&lt;input type="text"&gt;</code>. La presentación visual atraviesa un <code>&lt;canvas aria-hidden="true"&gt;</code> efímero.</li>
+        </ul>
+      </section>
+
+      <!-- 2 -->
+      <section id="criptografia">
+        <h2>2. Diseño del protocolo criptográfico</h2>
+        <p>
+          El núcleo criptográfico reside en <code>src/crypto/engine.ts</code> y delega el 100% de las primitivas matemáticas a <code>window.crypto.subtle</code> y <code>window.crypto.getRandomValues</code> (implementaciones nativas en C++/Rust compiladas en el navegador con instrucciones AES-NI / ARMv8 Crypto cuando el procesador dispone de ellas).
+        </p>
+
+        <h3>Pipeline de derivación de clave (KDF en dos etapas)</h3>
+        <pre><code>Master Password (UTF-8 Uint8Array)
+        │
+        ▼  crypto.subtle.importKey('raw', PBKDF2, extractable=false)
+        ▼  PBKDF2-HMAC-SHA512 (salt: 256-bit CSPRNG, iterations: 600,000) -> 256 bits
+        │  [finally: passwordBytes.fill(0)]
+        ▼  crypto.subtle.importKey('raw', HKDF, extractable=false)
+        ▼  HKDF-SHA512 (salt: 256-bit, info: "BASTION-VAULT-AES256GCM-KEY-V1")
+        │  [finally: intermediateBits.fill(0)]
+        ▼
+CryptoKey { algorithm: AES-GCM-256, extractable: false, usages: ['encrypt', 'decrypt'] }</code></pre>
+
+        <ul>
+          <li><strong>Sin almacenamiento de verificador/hash:</strong> No guardamos ningún hash de la clave maestra para comprobar si es correcta. La verificación sucede intrínsecamente durante <code>crypto.subtle.decrypt()</code> mediante la etiqueta AEAD de 128 bits de AES-GCM. Si la clave falla, el navegador lanza <code>DOMException(OperationError)</code>.</li>
+          <li><strong>Vinculación criptográfica AAD:</strong> Antes de cifrar o descifrar se construye un bloque canónico de datos autenticados adicionales:
+            <code>BASTION_VAULT|v1|AES-256-GCM|PBKDF2-HMAC-SHA512+HKDF-SHA512|{iterations}|{salt}|{scope}</code>.
+            Esto previene ataques de degradación de parámetros (<em>downgrade attacks</em>) o manipulación del encabezado JSON del sobre.
+          </li>
+          <li><strong>Rotación obligatoria de Nonce (IV):</strong> Cada operación de guardado en <code>encryptVaultWithKey()</code> solicita 12 bytes frescos (96 bits) a <code>crypto.getRandomValues()</code>. Nunca se reutiliza un par <code>(key, iv)</code>, evitando el colapso de confidencialidad e integridad inherente a la reutilización de nonces en GCM.</li>
+          <li><strong>Limpieza de buffers intermedios:</strong> Los arrays mutables <code>passwordBytes</code>, <code>intermediateBits</code>, <code>plaintextBytes</code> y <code>decryptedBytes</code> se sobrescriben explícitamente con ceros (<code>.fill(0)</code>) dentro de bloques <code>finally</code> para minimizar su tiempo de residencia en el heap de JavaScript.</li>
+        </ul>
+
+        <h3>Generación aleatoria sin sesgo de módulo</h3>
+        <p>
+          En <code>secureRandomInt(maxExclusive)</code> se evita el error clásico de usar <code>randomUint32 % N</code> (que introduce sesgo cuando 2<sup>32</sup> no es múltiplo de <code>N</code>). Se calcula <code>maxUnbiased = Math.floor(0x100000000 / maxExclusive) * maxExclusive</code> y se descartan muestras fuera de rango (<em>rejection sampling</em>), seguido de una permutación Fisher-Yates criptográfica sobre la contraseña resultante.
+        </p>
+      </section>
+
+      <!-- 3 -->
+      <section id="modelo-datos">
+        <h2>3. Modelo de datos y esquema del sobre .bvault</h2>
+        <p>
+          Tanto el registro almacenado en IndexedDB como los archivos exportables <code>.bvault</code> comparten exactamente el mismo contrato tipado <code>EncryptedVaultEnvelope</code> definido en <code>src/types/vault.ts</code>:
+        </p>
+
+        <pre><code>{
+  "format": "BASTION_VAULT",
+  "version": 1,
+  "cipher": "AES-256-GCM",
+  "kdf": "PBKDF2-HMAC-SHA512+HKDF-SHA512",
+  "iterations": 600000,
+  "salt": "&lt;Base64 de 32 bytes (256 bits)&gt;",
+  "iv": "&lt;Base64 de 12 bytes (96 bits)&gt;",
+  "scope": "local-vault | export-full | export-category",
+  "updatedAt": 1795370400000,
+  "ciphertext": "&lt;Base64(AES-GCM(JSON(VaultPayload)) || Tag-128bit)&gt;"
+}</code></pre>
+
+        <p>
+          Antes de intentar derivar cualquier llave al importar un archivo externo, el validador de esquema <code>isValidEnvelope()</code> exige coincidencia estricta de <code>format</code>, <code>version</code>, <code>cipher</code>, <code>kdf</code> y un mínimo de <code>iterations &gt;= 100_000</code>, rechazando sobres malformados o con parámetros debilitados.
+        </p>
+      </section>
+
+      <!-- 4 -->
+      <section id="modulos">
+        <h2>4. Anatomía detallada del código (módulo por módulo)</h2>
+
+        <div class="module-card">
+          <div class="module-header">
+            <span class="module-path">index.html · vite.config.ts · src/index.css · src/main.tsx</span>
+            <span class="module-role">Capa de arranque, CSP y PWA offline</span>
+          </div>
+          <p>
+            <code>index.html</code> establece la meta-política CSP <code>default-src 'self'; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'</code> que bloquea peticiones a internet desde el motor del navegador. <code>src/index.css</code> importa las fuentes <code>@fontsource/outfit</code>, <code>@fontsource/public-sans</code> y <code>@fontsource/jetbrains-mono</code> para que Vite las empaquete localmente en <code>dist/assets</code> sin depender de Google Fonts. <code>vite.config.ts</code> configura <code>VitePWA</code> con manifiesto <code>standalone</code>, iconos 192/512/maskable y precacheo Workbox. <code>src/main.tsx</code> ejecuta <code>registerSW({ immediate: true })</code>.
+          </p>
+        </div>
+
+        <div class="module-card">
+          <div class="module-header">
+            <span class="module-path">src/types/vault.ts</span>
+            <span class="module-role">Contratos de dominio y valores iniciales</span>
+          </div>
+          <p>
+            Centraliza las interfaces TypeScript para <code>VaultCategory</code>, <code>VaultEntry</code>, <code>SecuritySettings</code>, <code>VaultPayload</code>, <code>EncryptedVaultEnvelope</code>, <code>PasswordGenOptions</code> y <code>EntropyReport</code>, junto con las categorías iniciales y la configuración defensiva por defecto (30s portapapeles, 5 min auto-bloqueo, anti-OCR alto).
+          </p>
+        </div>
+
+        <div class="module-card">
+          <div class="module-header">
+            <span class="module-path">src/crypto/engine.ts</span>
+            <span class="module-role">Motor criptográfico puro (Web Crypto API)</span>
+          </div>
+          <p>
+            Implementa <code>deriveMasterKey</code>, <code>encryptVaultWithKey</code>, <code>decryptVaultEnvelope</code>, <code>createStandaloneEncryptedExport</code>, <code>isValidEnvelope</code>, <code>generateSecurePassword</code>, <code>calculateEntropyBits</code> y <code>generateUuid</code>. Carece de estado global mutable y no interactúa con almacenamiento ni DOM, lo que facilita su auditoría aislada.
+          </p>
+        </div>
+
+        <div class="module-card">
+          <div class="module-header">
+            <span class="module-path">src/storage/indexedDb.ts</span>
+            <span class="module-role">Repositorio local de sobres cifrados</span>
+          </div>
+          <p>
+            Envuelve la API asíncrona de IndexedDB en promesas tipadas (<code>loadStoredEnvelope</code>, <code>saveStoredEnvelope</code>, <code>deleteStoredEnvelope</code>) operando sobre la base <code>bastion_encrypted_vault_db</code> (store <code>envelopes</code>, clave única <code>primary_vault</code>). Cierra el handle de la base al completar cada transacción.
+          </p>
+        </div>
+
+        <div class="module-card">
+          <div class="module-header">
+            <span class="module-path">src/hooks/useClipboardGuard.ts · src/hooks/usePWAInstall.ts</span>
+            <span class="module-role">Hooks de integración de plataforma</span>
+          </div>
+          <p>
+            <code>useClipboardGuard</code> encapsula <code>navigator.clipboard.writeText</code> con un respaldo controlado (textarea efímero <code>aria-hidden</code> que se vacía y elimina del DOM en el mismo tick si el iframe restringe la API asíncrona), gestiona el temporizador de cuenta regresiva con resolución de 250 ms y sobrescribe el portapapeles con <code>""</code> al expirar o bloquear. <code>usePWAInstall</code> escucha <code>beforeinstallprompt</code> y detecta ejecución <code>standalone</code> o iOS Safari.
+          </p>
+        </div>
+
+        <div class="module-card">
+          <div class="module-header">
+            <span class="module-path">src/components/CanvasSecretViewer.tsx</span>
+            <span class="module-role">Renderizador aislado anti-DOM y anti-OCR</span>
+          </div>
+          <p>
+            Dibuja los secretos directamente en un contexto 2D de <code>&lt;canvas aria-hidden="true" role="presentation"&gt;</code> escalado a <code>devicePixelRatio</code>. Mantiene el estado oculto (14 puntos fijos que no filtran la longitud real de la contraseña) hasta que el usuario mantiene pulsado el botón (<code>onPointerDown</code> / teclado). Mientras está revelado, redibuja cada 320 ms variando ruido de fondo, micro-rotación y desplazamiento vertical por glifo usando <code>crypto.getRandomValues</code>. Escucha <code>blur</code> y <code>visibilitychange</code> para limpiar el lienzo inmediatamente ante pérdida de foco.
+          </p>
+        </div>
+
+        <div class="module-card">
+          <div class="module-header">
+            <span class="module-path">src/components/SecureVirtualKeypad.tsx · PrivacyCurtainOverlay.tsx</span>
+            <span class="module-role">Entrada segura y ocultamiento de pantalla</span>
+          </div>
+          <p>
+            <code>SecureVirtualKeypad</code> baraja dígitos, minúsculas, mayúsculas y símbolos mediante Fisher-Yates sobre <code>crypto.getRandomValues</code>, con opción de rebarajar tras cada clic para neutralizar ataques por mapa de coordenadas. <code>PrivacyCurtainOverlay</code> monta una barrera visual opaca con desenfoque sobre todo el viewport al pulsar <code>Ctrl+Shift+P</code> o al pasar la pestaña a segundo plano.
+          </p>
+        </div>
+
+        <div class="module-card">
+          <div class="module-header">
+            <span class="module-path">src/components/LockScreen.tsx · EntryInspector.tsx · ExportImportModal.tsx · SecuritySettingsModal.tsx · PasswordGeneratorModal.tsx</span>
+            <span class="module-role">Superficie de flujos de usuario</span>
+          </div>
+          <p>
+            Componentes funcionales desacoplados que delegan toda persistencia y cifrado a callbacks de <code>App.tsx</code>. En <code>ExportImportModal</code>, la exportación con "Clave maestra en RAM" cifra directamente usando el objeto <code>CryptoKey</code> activo sin pedir ni almacenar la contraseña en texto plano; la exportación con "Clave dedicada" invoca <code>createStandaloneEncryptedExport</code> generando una sal nueva de 256 bits.
+          </p>
+        </div>
+
+        <div class="module-card">
+          <div class="module-header">
+            <span class="module-path">src/App.tsx</span>
+            <span class="module-role">Controlador de sesión en RAM y espacio de trabajo</span>
+          </div>
+          <p>
+            Administra el ciclo de vida de <code>RamVaultSession</code>, el temporizador de inactividad, los atajos globales (<code>Ctrl+Shift+L</code>, <code>Ctrl+Shift+P</code>), la rotación de clave maestra (re-derivación con nueva sal + re-cifrado completo), el filtrado/ordenamiento reactivo en RAM y la limpieza en <code>beforeunload</code>.
+          </p>
+        </div>
+      </section>
+
+      <!-- 5 -->
+      <section id="anti-intercepcion">
+        <h2>5. Ingeniería de defensa contra agentes de IA y lectores de pantalla</h2>
+        <p>
+          Los agentes de navegador modernos (como extensiones basadas en árboles de accesibilidad o agentes multimodales que combinan inspección DOM + capturas periódicas) operan en dos vectores principales: <strong>extracción estructurada del DOM</strong> y <strong>reconocimiento visual OCR</strong>.
+        </p>
+        <ul>
+          <li><strong>Vector 1 — Bloqueo de DOM y Accessibility Tree:</strong> El visor <code>CanvasSecretViewer</code> nunca coloca el secreto en texto interno, atributos <code>title</code>, <code>aria-label</code> ni <code>data-*</code>. El lienzo lleva <code>aria-hidden="true"</code> y <code>role="presentation"</code>, bloquea <code>contextmenu</code>, <code>dragstart</code> y selección CSS (<code>user-select: none</code>). Incluso en estado enmascarado dibuja siempre 14 puntos fijos para no revelar la longitud real del secreto.</li>
+          <li><strong>Vector 2 — Mitigación de OCR y captura pasiva:</strong> La exposición visual es estrictamente efímera (solo mientras el dedo o botón permanece presionado). Cuando se revela, se aplican tres perturbaciones calibradas para mantener legibilidad humana mientras degradan la segmentación OCR automática: (a) líneas y moteado de interferencia aleatorios por frame, (b) micro-desplazamiento vertical y angular independiente por carácter con refresco cada 320 ms, y (c) ocultamiento automático al perder foco la ventana o cambiar de pestaña.</li>
+          <li><strong>Vector 3 — Mitigación de keyloggers de nivel DOM:</strong> El <code>SecureVirtualKeypad</code> inyecta caracteres directamente en estado React sin disparar eventos <code>keydown</code> de la contraseña sobre el campo de entrada y cambia el layout de teclas aleatoriamente.</li>
+        </ul>
+      </section>
+
+      <!-- 6 -->
+      <section id="decisiones">
+        <h2>6. Decisiones de arquitectura y análisis de alternativas (ADRs)</h2>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Decisión Arquitectónica</th>
+              <th>Enfoque Elegido en Bastión</th>
+              <th>Alternativas Descartadas y Por Qué</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>ADR-01: Motor Criptográfico</strong></td>
+              <td><strong>Web Crypto API nativa</strong> (<code>PBKDF2-SHA512 600k + HKDF + AES-256-GCM</code>) con <code>extractable: false</code>.</td>
+              <td><em>Librerías JS puras (CryptoJS, Forge):</em> ejecutan aritmética sensible en el heap de JS exponiendo bytes de clave a volcados, carecen de aceleración AES-NI y añaden riesgo de cadena de suministro. <em>Argon2 WASM:</em> aunque resistente a ASIC/GPU, requiere memoria lineal WASM inspeccionable y binarios externos adicionales; 600,000 iteraciones de PBKDF2-HMAC-SHA512 cumplen la recomendación vigente de OWASP manteniendo cero dependencias criptográficas de terceros.</td>
+            </tr>
+            <tr>
+              <td><strong>ADR-02: Empaquetado de Escritorio</strong></td>
+              <td><strong>PWA Offline Standalone</strong> con fuentes empaquetadas y CSP estricta.</td>
+              <td><em>Electron desde el inicio:</em> empaqueta ~150 MB de Chromium + Node.js ampliando la superficie de ataque con acceso directo al sistema de archivos y ejecución de procesos. La PWA ofrece instalación directa en escritorio con sandbox nativo del navegador y puede envolverse en Tauri/Electron sin reescribir la lógica.</td>
+            </tr>
+            <tr>
+              <td><strong>ADR-03: Persistencia Local</strong></td>
+              <td><strong>Híbrido: IndexedDB (solo ciphertext) + archivos <code>.bvault</code> + Modo Efímero opcional</strong>.</td>
+              <td><em>localStorage:</em> síncrono, límite pequeño (~5 MB) y compartido de forma menos estructurada. <em>Solo archivos manuales obligatorios:</em> genera fricción alta en uso cotidiano y riesgo de pérdida accidental si el usuario recarga la pestaña; ofrecer Modo Efímero opcional da el máximo control a perfiles paranoicos sin penalizar al resto.</td>
+            </tr>
+            <tr>
+              <td><strong>ADR-04: Validación de Clave Maestra</strong></td>
+              <td><strong>Verificación implícita por etiqueta AEAD (GCM 128-bit)</strong> sin guardar hashes.</td>
+              <td><em>Guardar hash salted de la clave maestra:</em> crea un oráculo offline separado más barato de atacar y duplica superficie de verificación. Con AEAD, la integridad del sobre y la corrección de la llave se validan en un único paso atómico.</td>
+            </tr>
+            <tr>
+              <td><strong>ADR-05: Renderizado de Secretos</strong></td>
+              <td><strong>Canvas 2D efímero (Hold-to-Reveal) + ruido anti-OCR + teclado aleatorio</strong>.</td>
+              <td><em>Input HTML con toggle <code>type="password"</code> ↔ <code>"text"</code>:</em> expone el valor en texto claro al DOM, al árbol de accesibilidad, a autocompletadores y a cualquier extensión o agente que inspeccione el documento.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- 7 -->
+      <section id="modelo-amenazas">
+        <h2>7. Modelo de amenazas y límites honestos</h2>
+        <div class="panel panel-danger">
+          <p class="panel-title">Qué protege Bastión y qué queda fuera de su frontera</p>
+          <p><strong>Protegido eficazmente:</strong> Robo físico del disco o respaldo <code>.bvault</code> (sin clave maestra), intercepción de tráfico de red (tráfico nulo), manipulación silenciosa de archivos cifrados (detección AEAD), lectura pasiva del DOM o árbol de accesibilidad por lectores de pantalla y agentes basados en DOM, persistencia residual en portapapeles y fuga de clave maestra hacia almacenamiento persistente.</p>
+          <p style="margin-bottom:0;"><strong>Fuera de la frontera de cualquier aplicación en espacio de usuario:</strong> Un sistema operativo ya comprometido a nivel de kernel (rootkit / privilegios Ring-0), un volcado forense de memoria RAM física mientras la bóveda está activamente desbloqueada, o una cámara física externa grabando la pantalla mientras mantienes pulsado el botón de revelado. En entornos de riesgo extremo, combina Bastión con cifrado de disco completo (BitLocker / LUKS / FileVault) y un equipo dedicado sin red.</p>
+        </div>
+      </section>
+
+      <!-- 8 -->
+      <section id="produccion">
+        <h2>8. Cómo descargar, instalar y poner Bastión en producción</h2>
+        <p>
+          Al tratarse de una aplicación estática 100% autocontenida tras la compilación (<code>dist/</code>), poner Bastión en producción no requiere servidores de base de datos, contenedores complejos ni claves API. Sigue este procedimiento paso a paso:
+        </p>
+
+        <h3>8.1 Requisitos previos</h3>
+        <ul>
+          <li><strong>Node.js 20 LTS o superior</strong> (incluye <code>npm</code>) únicamente en la máquina donde se compilará el paquete.</li>
+          <li>Navegador moderno basado en Chromium (Chrome, Edge, Brave), Firefox o Safari para ejecutar e instalar la PWA.</li>
+        </ul>
+
+        <h3>8.2 Descarga e instalación local del código fuente</h3>
+        <pre><code># 1. Descarga o clona el repositorio del proyecto en tu equipo
+git clone &lt;URL_DE_TU_REPOSITORIO&gt; bastion-vault
+cd bastion-vault
+
+# 2. Instala las dependencias exactas declaradas en package.json
+npm install
+
+# 3. Verifica tipos TypeScript (cero errores antes de compilar)
+npm run lint
+
+# 4. Ejecuta en modo desarrollo local (puerto 3000) para pruebas
+npm run dev</code></pre>
+
+        <h3>8.3 Compilación del artefacto de producción</h3>
+        <pre><code># Genera la carpeta optimizada y autocontenida dist/
+# Incluye bundle JS/CSS, fuentes locales @fontsource, iconos PNG,
+# manifest.webmanifest, Service Worker (sw.js) y manuales HTML.
+npm run build
+
+# Prueba local del build de producción antes de desplegar
+npm run preview -- --port 4173 --host 127.0.0.1</code></pre>
+
+        <div class="panel panel-amber">
+          <p class="panel-title">Requisito de Contexto Seguro (HTTPS o localhost)</p>
+          <p style="margin:0;">
+            Por especificación de seguridad de los navegadores, tanto <code>window.crypto.subtle</code> (Web Crypto API) como el registro de <strong>Service Workers</strong> y la API del portapapeles requieren ejecutarse en un <strong>Contexto Seguro</strong>: esto es <code>http://localhost</code> / <code>http://127.0.0.1</code> en local, o <code>https://</code> con certificado TLS válido en red o servidor. No abras <code>dist/index.html</code> directamente mediante <code>file://</code>.
+          </p>
+        </div>
+
+        <h3>8.4 Opción A — Puesta en producción local en escritorio (100% offline / sin servidor público)</h3>
+        <ol>
+          <li>Copia la carpeta compilada <code>dist/</code> a una ruta fija en tu equipo (por ejemplo <code>/opt/bastion</code> o <code>C:\Bastion</code>).</li>
+          <li>Sirve los archivos estáticos exclusivamente en la interfaz loopback local (<code>127.0.0.1</code>, inaccesible desde la red):
+            <pre><code># Usando npx serve (o cualquier servidor estático ligero como Caddy o Python http.server)
+npx serve -s dist -l tcp://127.0.0.1:4173</code></pre>
+          </li>
+          <li>Abre <code>http://127.0.0.1:4173</code> en Chrome, Edge o Brave y pulsa <strong>Instalar app de escritorio</strong>.</li>
+          <li>El Service Worker precacheará todos los activos. Desde ese momento puedes cerrar el servidor temporal si lo deseas o mantenerlo en segundo plano; la aplicación quedará instalada en el menú de aplicaciones del sistema.</li>
+        </ol>
+
+        <h3>8.5 Opción B — Despliegue en servidor propio (Intranet / HTTPS con Nginx)</h3>
+        <p>
+          Ideal para distribuir Bastión dentro de una red corporativa o servidor personal bajo HTTPS, aplicando cabeceras HTTP de endurecimiento en el servidor web. Copia el contenido de <code>dist/</code> a <code>/var/www/bastion</code> y configura Nginx:
+        </p>
+        <pre><code>server {
+    listen 443 ssl http2;
+    server_name boveda.tu-dominio.local;
+
+    ssl_certificate     /etc/ssl/certs/bastion.crt;
+    ssl_certificate_key /etc/ssl/private/bastion.key;
+    ssl_protocols       TLSv1.3 TLSv1.2;
+
+    root /var/www/bastion;
+    index index.html;
+
+    # Cabeceras de aislamiento estricto (defensa en profundidad)
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; media-src 'none'; base-uri 'self'; form-action 'none';" always;
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "no-referrer" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()" always;
+    add_header Cross-Origin-Opener-Policy "same-origin" always;
+    add_header Cross-Origin-Resource-Policy "same-origin" always;
+
+    # Nunca cachear el Service Worker ni el manifiesto en proxy/navegador
+    location ~* ^/(sw\.js|registerSW\.js|manifest\.webmanifest)$ {
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+    }
+
+    # Activos con hash inmutables (JS, CSS, fuentes locales)
+    location /assets/ {
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+
+    # Manuales estáticos autónomos
+    location ~* ^/manual-(usuario|arquitecto)\.html$ {
+        try_files $uri =404;
+    }
+
+    # Fallback SPA
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}</code></pre>
+
+        <h3>8.6 Opción C — Empaquetado nativo opcional para equipos Air-Gapped (Tauri)</h3>
+        <p>
+          Si tu organización requiere un binario nativo <code>.exe</code> / <code>.dmg</code> / <code>.AppImage</code> distribuible en equipos sin navegador autorizado, el directorio <code>dist/</code> es directamente compatible con <strong>Tauri v2</strong> apuntando <code>frontendDist: "../dist"</code> en <code>tauri.conf.json</code> sin modificar una sola línea de la lógica criptográfica, ya que el WebView nativo provee Web Crypto API, IndexedDB y Canvas 2D.
+        </p>
+      </section>
+
+      <!-- 9 -->
+      <section id="auditoria">
+        <h2>9. Lista de verificación antes de pasar a producción</h2>
+        <ul class="check-list">
+          <li><strong>1. Cero tráfico externo:</strong> Abre DevTools → pestaña <em>Network</em>, recarga con caché limpia, crea una bóveda, genera contraseñas y exporta un <code>.bvault</code>. Confirma que el 100% de las solicitudes van al propio origen y 0 peticiones salen a dominios externos.</li>
+          <li><strong>2. Operación sin red verificada:</strong> En DevTools → <em>Application → Service Workers</em>, activa la casilla <strong>Offline</strong> y recarga la página. Bastión debe arrancar, desbloquear, cifrar y exportar sin errores.</li>
+          <li><strong>3. Inspección de almacenamiento en disco:</strong> En DevTools → <em>Application → IndexedDB → bastion_encrypted_vault_db</em>, comprueba que únicamente existe el registro <code>primary_vault</code> con campos <code>salt</code>, <code>iv</code> y <code>ciphertext</code> en Base64, sin ninguna cadena en texto plano. Verifica que <code>localStorage</code> y <code>sessionStorage</code> estén vacíos.</li>
+          <li><strong>4. Auditoría DOM de contraseñas:</strong> Selecciona una credencial, inspecciona el elemento del visor con DevTools y mantén pulsado <em>Mantener para revelar</em>. Confirma que la contraseña no aparece en ningún nodo HTML ni en el panel de <em>Accessibility</em>.</li>
+          <li><strong>5. Prueba de integridad AEAD:</strong> Exporta un <code>.bvault</code>, altera 1 carácter del campo <code>ciphertext</code> o del valor <code>iterations</code> con un editor de texto e intenta importarlo. Bastión debe rechazarlo inmediatamente con error de verificación AES-GCM.</li>
+        </ul>
+      </section>
+
+      <footer>
+        <span>Bastión — Manual de Arquitecto e Ingeniería de Despliegue</span>
+        <span>Documento técnico autónomo offline</span>
+      </footer>
+    </main>
+  </div>
+</body>
+</html>

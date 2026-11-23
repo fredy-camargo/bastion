@@ -1,0 +1,36 @@
+# Build, dependencies, and local Windows launcher binaries
+node_modules/
+build/
+dist/
+dev-dist/
+coverage/
+.vite/
+Bastion.exe
+Bastion.ico
+
+# OS and logs
+.DS_Store
+Thumbs.db
+*.log
+
+# Secrets, credentials, and environment variables (OWASP Zero-Trust)
+.env
+.env.*
+token.json
+credentials.json
+client_secret*.json
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Local databases, audio caches, and sensitive vault backups
+*.db
+*.sqlite
+*.sqlite3
+*.mp3
+*.ogg
+*.wav
+*.bastion
+*.vault
+*.bvault
