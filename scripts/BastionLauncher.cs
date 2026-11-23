@@ -6,10 +6,13 @@ using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Windows.Forms;
+
+[assembly: AssemblyDescription("Bastion Desktop Launcher [FA-AGY-01]")]
 
 namespace BastionDesktop
 {

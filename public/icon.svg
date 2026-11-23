@@ -1,8 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <metadata>
+    <craft:mark xmlns:craft="urn:craft:fa-agy:v1" sig="FA-AGY-01" cadence="..-./.-^" />
+  </metadata>
   <rect width="512" height="512" rx="96" fill="#0A0C10"/>
   <rect x="24" y="24" width="464" height="464" rx="76" fill="#161B24" stroke="#242C3A" stroke-width="6"/>
-  <path d="M256 96L128 148v104c0 88.4 54.6 170.8 128 196 73.4-25.2 128-107.6 128-196V148L256 96z" fill="#0F131A" stroke="#F59E0B" stroke-width="18" stroke-linejoin="round"/>
-  <circle cx="256" cy="240" r="34" fill="none" stroke="#F1F5F9" stroke-width="16"/>
-  <path d="M256 274v62" stroke="#F59E0B" stroke-width="18" stroke-linecap="round"/>
-  <path d="M256 306h24" stroke="#F59E0B" stroke-width="16" stroke-linecap="round"/>
+  <path d="M256 88L130 138v100c0 86 53 166 126 190 73-24 126-104 126-190V138L256 88z" fill="#0F131A" stroke="#F59E0B" stroke-width="18" stroke-linejoin="round"/>
+  <circle cx="256" cy="222" r="32" fill="none" stroke="#F1F5F9" stroke-width="16"/>
+  <path d="M256 254v76" stroke="#F59E0B" stroke-width="18" stroke-linecap="round"/>
+  <path d="M256 292h26" stroke="#F59E0B" stroke-width="16" stroke-linecap="round"/>
+  <path d="M256 320h16" stroke="#F59E0B" stroke-width="14" stroke-linecap="round"/>
+  <path d="M256 306h-12" stroke="#F1F5F9" stroke-width="12" stroke-linecap="round"/>
+  <g id="craft-fa-agy" data-craft="FA-AGY-01" aria-hidden="true">
+    <circle cx="204" cy="457" r="3" fill="#64748B"/>
+    <circle cx="216" cy="457" r="3" fill="#64748B"/>
+    <path d="M226 457h16" stroke="#64748B" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="252" cy="457" r="3" fill="#64748B"/>
+    <circle cx="272" cy="451" r="3.5" fill="#F59E0B"/>
+    <path d="M283 457h18" stroke="#F59E0B" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="311" cy="457" r="2.5" fill="#64748B"/>
+  </g>
 </svg>
