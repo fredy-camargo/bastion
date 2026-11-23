@@ -39,7 +39,7 @@ try {
   }
 
   Write-Host "[3/4] Compilando ejecutable nativo Bastion.exe..."
-  & $CscPath /nologo /optimize+ /target:winexe /win32icon:"$IconPath" /r:System.dll /r:System.Windows.Forms.dll /out:"$ExePath" "$LauncherCs"
+  & $CscPath /nologo /optimize+ /target:winexe /win32icon:"$IconPath" /r:System.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll /out:"$ExePath" "$LauncherCs"
   if ($LASTEXITCODE -ne 0 -or -not (Test-Path $ExePath)) {
     throw "Falló la compilación de Bastion.exe"
   }
