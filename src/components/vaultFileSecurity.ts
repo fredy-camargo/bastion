@@ -1,9 +1,11 @@
 import { isValidEnvelope } from '../crypto/engine';
-import type {
-  EncryptedVaultEnvelope,
-  VaultCategory,
-  VaultEntry,
-  VaultPayload,
+import {
+  ALLOWED_ROTATION_INTERVAL_DAYS,
+  type EncryptedVaultEnvelope,
+  type RotationIntervalDays,
+  type VaultCategory,
+  type VaultEntry,
+  type VaultPayload,
 } from '../types/vault';
 
 /** Maximum allowed size for an imported .bvault file (10 MiB) to prevent memory exhaustion / DoS. */
@@ -12,6 +14,7 @@ export const MAX_BVAULT_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_IMPORT_CATEGORIES = 500;
 const MAX_IMPORT_ENTRIES = 50_000;
 const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+const ALLOWED_ROTATION_DAYS_SET = new Set<number>(ALLOWED_ROTATION_INTERVAL_DAYS);
 
 function sanitizePlainValue(value: unknown, depth = 0): unknown {
   if (depth > 32) {
@@ -133,7 +136,7 @@ export function sanitizeImportedPayload(
     const rawCatId = asSafeString(rec.categoryId).trim();
     const categoryId = validCatIds.has(rawCatId) ? rawCatId : defaultCatId;
 
-    entries.push({
+    const safeEntry: VaultEntry = {
       id,
       title: title.slice(0, 200),
       categoryId,
@@ -144,7 +147,24 @@ export function sanitizeImportedPayload(
       favorite: Boolean(rec.favorite),
       createdAt: asSafeTimestamp(rec.createdAt, now),
       updatedAt: asSafeTimestamp(rec.updatedAt, now),
-    });
+    };
+
+    if (
+      typeof rec.passwordUpdatedAt === 'number' &&
+      Number.isFinite(rec.passwordUpdatedAt) &&
+      rec.passwordUpdatedAt >= 0
+    ) {
+      safeEntry.passwordUpdatedAt = rec.passwordUpdatedAt;
+    }
+
+    if (
+      typeof rec.rotationIntervalDays === 'number' &&
+      ALLOWED_ROTATION_DAYS_SET.has(rec.rotationIntervalDays)
+    ) {
+      safeEntry.rotationIntervalDays = rec.rotationIntervalDays as RotationIntervalDays;
+    }
+
+    entries.push(safeEntry);
   }
 
   return { categories: safeCategories, entries };

@@ -1,9 +1,11 @@
 import {
+  ALLOWED_ROTATION_INTERVAL_DAYS,
   DEFAULT_SECURITY_SETTINGS,
   VAULT_LIMITS,
   type EncryptedVaultEnvelope,
   type EntropyReport,
   type PasswordGenOptions,
+  type RotationIntervalDays,
   type SecuritySettings,
   type VaultCategory,
   type VaultEntry,
@@ -21,6 +23,7 @@ const CANONICAL_BASE64_RE = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z
 const MAX_B64_CIPHERTEXT_CHARS = Math.ceil(VAULT_LIMITS.MAX_ENVELOPE_BYTES / 3) * 4 + 64;
 const ALLOWED_CLIPBOARD_TIMEOUTS = new Set<number>([15, 30, 60]);
 const ALLOWED_AUTOLOCK_MINUTES = new Set<number>([1, 3, 5, 15]);
+const ALLOWED_ROTATION_DAYS_SET = new Set<number>(ALLOWED_ROTATION_INTERVAL_DAYS);
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -180,8 +183,23 @@ function sanitizeEntry(raw: unknown): VaultEntry {
   if (typeof raw.updatedAt !== 'number' || !Number.isFinite(raw.updatedAt) || raw.updatedAt < 0) {
     throw new Error('Campo "entry.updatedAt" inválido.');
   }
+  if (
+    raw.passwordUpdatedAt !== undefined &&
+    (typeof raw.passwordUpdatedAt !== 'number' ||
+      !Number.isFinite(raw.passwordUpdatedAt) ||
+      raw.passwordUpdatedAt < 0)
+  ) {
+    throw new Error('Campo "entry.passwordUpdatedAt" inválido.');
+  }
+  if (
+    raw.rotationIntervalDays !== undefined &&
+    (typeof raw.rotationIntervalDays !== 'number' ||
+      !ALLOWED_ROTATION_DAYS_SET.has(raw.rotationIntervalDays))
+  ) {
+    throw new Error('Campo "entry.rotationIntervalDays" inválido.');
+  }
 
-  return {
+  const entry: VaultEntry = {
     id,
     title,
     categoryId,
@@ -193,6 +211,13 @@ function sanitizeEntry(raw: unknown): VaultEntry {
     createdAt: raw.createdAt,
     updatedAt: raw.updatedAt,
   };
+  if (raw.passwordUpdatedAt !== undefined) {
+    entry.passwordUpdatedAt = raw.passwordUpdatedAt;
+  }
+  if (raw.rotationIntervalDays !== undefined) {
+    entry.rotationIntervalDays = raw.rotationIntervalDays as RotationIntervalDays;
+  }
+  return entry;
 }
 
 function sanitizeSecuritySettings(raw: unknown): SecuritySettings {
@@ -237,12 +262,24 @@ function sanitizeSecuritySettings(raw: unknown): SecuritySettings {
     throw new Error('Valor inválido para ephemeralMode.');
   }
 
+  const defaultRotationDays =
+    raw.defaultRotationDays === undefined
+      ? DEFAULT_SECURITY_SETTINGS.defaultRotationDays
+      : raw.defaultRotationDays;
+  if (
+    typeof defaultRotationDays !== 'number' ||
+    !ALLOWED_ROTATION_DAYS_SET.has(defaultRotationDays)
+  ) {
+    throw new Error('Valor inválido para defaultRotationDays.');
+  }
+
   return {
     clipboardTimeoutSec: clipboardTimeoutSec as SecuritySettings['clipboardTimeoutSec'],
     autoLockMinutes: autoLockMinutes as SecuritySettings['autoLockMinutes'],
     lockOnBlur,
     ocrNoiseLevel,
     ephemeralMode,
+    defaultRotationDays: defaultRotationDays as RotationIntervalDays,
   };
 }
 

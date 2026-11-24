@@ -23,6 +23,7 @@ import { LockScreen } from './components/LockScreen';
 import { PasswordGeneratorModal } from './components/PasswordGeneratorModal';
 import { PrivacyCurtainOverlay } from './components/PrivacyCurtainOverlay';
 import { PWAInstallButton } from './components/PWAInstallButton';
+import { RotationTrafficLight } from './components/RotationTrafficLight';
 import { SecuritySettingsModal } from './components/SecuritySettingsModal';
 import { sanitizeImportedPayload } from './components/vaultFileSecurity';
 import {
@@ -53,6 +54,11 @@ import {
   type VaultEntry,
   type VaultPayload,
 } from './types/vault';
+import {
+  compareRotationUrgency,
+  evaluatePasswordRotation,
+  type RotationEvaluation,
+} from './utils/passwordRotation';
 
 interface RamVaultSession {
   key: CryptoKey; // extractable: false, exclusivamente en RAM
@@ -68,9 +74,9 @@ export default function App() {
   const [lockReason, setLockReason] = useState<string | null>(null);
 
   // Estado de navegación y filtros en RAM
-  const [selectedFilter, setSelectedFilter] = useState<string>('all'); // 'all' | 'favorites' | categoryId
+  const [selectedFilter, setSelectedFilter] = useState<string>('all'); // 'all' | 'favorites' | 'review' | categoryId
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'updated' | 'title' | 'entropy'>('updated');
+  const [sortBy, setSortBy] = useState<'updated' | 'title' | 'entropy' | 'rotation'>('updated');
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const [isCreatingEntry, setIsCreatingEntry] = useState(false);
 
@@ -468,7 +474,7 @@ export default function App() {
   // Operaciones CRUD en RAM + re-cifrado inmediato
   const handleSaveEntry = useCallback(
     async (
-      data: Omit<VaultEntry, 'id' | 'createdAt' | 'updatedAt'>,
+      data: Omit<VaultEntry, 'id' | 'createdAt' | 'updatedAt' | 'passwordUpdatedAt'>,
       existingId?: string
     ) => {
       const active = sessionRef.current;
@@ -479,9 +485,25 @@ export default function App() {
       let nextEntries: VaultEntry[];
 
       if (existingId) {
-        nextEntries = active.payload.entries.map((item) =>
-          item.id === existingId ? { ...item, ...data, updatedAt: now } : item
-        );
+        const { rotationIntervalDays, ...restData } = data;
+        nextEntries = active.payload.entries.map((item) => {
+          if (item.id !== existingId) return item;
+          const passwordChanged = item.password !== data.password;
+          const nextEntry: VaultEntry = {
+            ...item,
+            ...restData,
+            updatedAt: now,
+            passwordUpdatedAt: passwordChanged
+              ? now
+              : (item.passwordUpdatedAt ?? item.updatedAt ?? item.createdAt),
+          };
+          if (rotationIntervalDays !== undefined) {
+            nextEntry.rotationIntervalDays = rotationIntervalDays;
+          } else {
+            delete nextEntry.rotationIntervalDays;
+          }
+          return nextEntry;
+        });
       } else {
         targetId = generateUuid();
         const created: VaultEntry = {
@@ -489,7 +511,11 @@ export default function App() {
           id: targetId,
           createdAt: now,
           updatedAt: now,
+          passwordUpdatedAt: now,
         };
+        if (data.rotationIntervalDays === undefined) {
+          delete created.rotationIntervalDays;
+        }
         nextEntries = [created, ...active.payload.entries];
       }
 
@@ -681,15 +707,41 @@ export default function App() {
     [persistPayload, showNotice]
   );
 
+  const rotationById = useMemo(() => {
+    const map = new Map<string, RotationEvaluation>();
+    if (!session) return map;
+    const defaultDays = session.payload.settings.defaultRotationDays;
+    const now = Date.now();
+    for (const entry of session.payload.entries) {
+      map.set(entry.id, evaluatePasswordRotation(entry, defaultDays, now));
+    }
+    return map;
+  }, [session]);
+
+  const reviewCount = useMemo(() => {
+    let count = 0;
+    for (const rot of rotationById.values()) {
+      if (rot.status === 'due' || rot.status === 'soon') {
+        count += 1;
+      }
+    }
+    return count;
+  }, [rotationById]);
+
   // Entradas filtradas y ordenadas
   const visibleEntries = useMemo(() => {
     if (!session) return [];
     const q = searchQuery.trim().toLowerCase();
     const list = session.payload.entries.filter((entry) => {
       if (selectedFilter === 'favorites' && !entry.favorite) return false;
+      if (selectedFilter === 'review') {
+        const st = rotationById.get(entry.id)?.status;
+        if (st !== 'due' && st !== 'soon') return false;
+      }
       if (
         selectedFilter !== 'all' &&
         selectedFilter !== 'favorites' &&
+        selectedFilter !== 'review' &&
         entry.categoryId !== selectedFilter
       ) {
         return false;
@@ -707,9 +759,17 @@ export default function App() {
       if (sortBy === 'entropy') {
         return calculateEntropyBits(a.password).bits - calculateEntropyBits(b.password).bits;
       }
+      if (sortBy === 'rotation') {
+        const ra = rotationById.get(a.id);
+        const rb = rotationById.get(b.id);
+        if (ra && rb) {
+          const cmp = compareRotationUrgency(ra, rb);
+          if (cmp !== 0) return cmp;
+        }
+      }
       return b.updatedAt - a.updatedAt;
     });
-  }, [session, selectedFilter, searchQuery, sortBy]);
+  }, [session, selectedFilter, searchQuery, sortBy, rotationById]);
 
   const selectedEntry = useMemo(() => {
     if (!session || !selectedEntryId) return null;
@@ -757,6 +817,8 @@ export default function App() {
       ? 'Todas las credenciales'
       : selectedFilter === 'favorites'
       ? 'Favoritas'
+      : selectedFilter === 'review'
+      ? 'Por revisar (semáforo)'
       : categoryNameMap.get(selectedFilter) ?? 'Categoría';
 
   return (
@@ -868,6 +930,33 @@ export default function App() {
                 </span>
                 <span className="font-mono tabular-nums text-[11px] text-[#94A3B8]">
                   {session.payload.entries.filter((e) => e.favorite).length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedFilter('review')}
+                className={`w-full flex items-center justify-between rounded-md px-3 py-2 text-xs font-medium transition-colors cursor-pointer ${
+                  selectedFilter === 'review'
+                    ? 'bg-[#161B24] text-[#F1F5F9] border border-[#242C3A]'
+                    : 'text-[#94A3B8] hover:bg-[#161B24]/60 hover:text-[#F1F5F9] border border-transparent'
+                }`}
+              >
+                <span className="inline-flex items-center gap-2.5 truncate">
+                  <span
+                    aria-hidden="true"
+                    className={`h-2.5 w-2.5 rounded-full shrink-0 ${
+                      reviewCount > 0 ? 'bg-amber-400' : 'bg-emerald-500/70'
+                    }`}
+                  />
+                  <span className="truncate">Por revisar</span>
+                </span>
+                <span
+                  className={`font-mono tabular-nums text-[11px] ${
+                    reviewCount > 0 ? 'text-amber-300' : 'text-[#94A3B8]'
+                  }`}
+                >
+                  {reviewCount}
                 </span>
               </button>
             </div>
@@ -1051,11 +1140,14 @@ export default function App() {
 
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as 'updated' | 'title' | 'entropy')}
+                onChange={(e) =>
+                  setSortBy(e.target.value as 'updated' | 'title' | 'entropy' | 'rotation')
+                }
                 aria-label="Ordenar credenciales"
                 className="rounded-md border border-[#242C3A] bg-[#0F131A] px-3 py-2 text-xs text-[#F1F5F9] focus:border-amber-500 focus:outline-none"
               >
                 <option value="updated">Más recientes</option>
+                <option value="rotation">Vigencia (revisar primero)</option>
                 <option value="title">Alfabético (A–Z)</option>
                 <option value="entropy">Menor entropía primero</option>
               </select>
@@ -1175,7 +1267,8 @@ export default function App() {
                     <th className="py-2.5 pl-6 pr-3">Servicio</th>
                     <th className="py-2.5 px-3 hidden sm:table-cell">Usuario</th>
                     <th className="py-2.5 px-3 hidden md:table-cell">Categoría</th>
-                    <th className="py-2.5 px-3 text-right">Entropía</th>
+                    <th className="py-2.5 px-3">Vigencia</th>
+                    <th className="py-2.5 px-3 text-right hidden sm:table-cell">Entropía</th>
                     <th className="py-2.5 pl-3 pr-6 text-right">Acciones</th>
                   </tr>
                 </thead>
@@ -1183,6 +1276,9 @@ export default function App() {
                   {visibleEntries.map((entry) => {
                     const isSelected = !isCreatingEntry && selectedEntryId === entry.id;
                     const rep = calculateEntropyBits(entry.password);
+                    const rot =
+                      rotationById.get(entry.id) ??
+                      evaluatePasswordRotation(entry, currentSettings.defaultRotationDays);
                     const isCopied =
                       clipboardState.activeEntryId === entry.id &&
                       clipboardState.secondsRemaining > 0;
@@ -1237,7 +1333,10 @@ export default function App() {
                         <td className="py-2.5 px-3 hidden md:table-cell text-xs text-[#94A3B8] whitespace-nowrap">
                           {categoryNameMap.get(entry.categoryId) ?? 'General'}
                         </td>
-                        <td className="py-2.5 px-3 text-right font-mono text-xs tabular-nums whitespace-nowrap">
+                        <td className="py-2.5 px-3 whitespace-nowrap">
+                          <RotationTrafficLight evaluation={rot} compact />
+                        </td>
+                        <td className="py-2.5 px-3 hidden sm:table-cell text-right font-mono text-xs tabular-nums whitespace-nowrap">
                           <span className={entropyTextClass}>{rep.bits} b</span>
                         </td>
                         <td className="py-2.5 pl-3 pr-6 text-right">
@@ -1308,10 +1407,13 @@ export default function App() {
           isCreating={isCreatingEntry}
           categories={session.payload.categories}
           defaultCategoryId={
-            selectedFilter !== 'all' && selectedFilter !== 'favorites'
+            selectedFilter !== 'all' &&
+            selectedFilter !== 'favorites' &&
+            selectedFilter !== 'review'
               ? selectedFilter
               : session.payload.categories[0]?.id ?? 'cat-personal'
           }
+          defaultRotationDays={currentSettings.defaultRotationDays}
           noiseLevel={session.payload.settings.ocrNoiseLevel}
           activeCopiedEntryId={clipboardState.activeEntryId}
           clipboardSecondsLeft={clipboardState.secondsRemaining}

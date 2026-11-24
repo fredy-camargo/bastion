@@ -1,5 +1,11 @@
 export type OcrNoiseLevel = 'standard' | 'high';
 
+export type RotationIntervalDays = 0 | 7 | 30 | 90 | 180 | 365;
+
+export const ALLOWED_ROTATION_INTERVAL_DAYS: readonly RotationIntervalDays[] = [
+  0, 7, 30, 90, 180, 365,
+] as const;
+
 export interface VaultCategory {
   id: string;
   name: string;
@@ -17,6 +23,8 @@ export interface VaultEntry {
   favorite: boolean;
   createdAt: number;
   updatedAt: number;
+  passwordUpdatedAt?: number;
+  rotationIntervalDays?: RotationIntervalDays;
 }
 
 export interface SecuritySettings {
@@ -25,6 +33,7 @@ export interface SecuritySettings {
   lockOnBlur: boolean;
   ocrNoiseLevel: OcrNoiseLevel;
   ephemeralMode: boolean;
+  defaultRotationDays: RotationIntervalDays;
 }
 
 export interface VaultPayload {
@@ -103,4 +112,5 @@ export const DEFAULT_SECURITY_SETTINGS: SecuritySettings = {
   lockOnBlur: false,
   ocrNoiseLevel: 'high',
   ephemeralMode: false,
+  defaultRotationDays: 180,
 };

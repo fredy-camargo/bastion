@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle2, KeyRound, Shield, X } from 'lucide-react';
 import { calculateEntropyBits, KDF_ITERATIONS } from '../crypto/engine';
-import type { SecuritySettings } from '../types/vault';
+import type { RotationIntervalDays, SecuritySettings } from '../types/vault';
+import { ROTATION_OPTIONS } from '../utils/passwordRotation';
 
 interface SecuritySettingsModalProps {
   settings: SecuritySettings;
@@ -193,6 +194,43 @@ export const SecuritySettingsModal: React.FC<SecuritySettingsModalProps> = ({
               </span>
             </label>
           </div>
+        </div>
+
+        {/* Semáforo de rotación de contraseñas */}
+        <div className="rounded-lg border border-[#242C3A] bg-[#0F131A] p-4 space-y-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <label className="text-xs font-semibold text-[#F1F5F9]">
+              Semáforo de rotación de contraseñas (periodicidad predeterminada)
+            </label>
+            <span className="text-[11px] font-mono text-amber-300">
+              {ROTATION_OPTIONS.find((o) => o.days === draft.defaultRotationDays)?.label}
+            </span>
+          </div>
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 rounded-lg bg-[#0A0C10] p-1 border border-[#242C3A]">
+            {ROTATION_OPTIONS.map((opt) => (
+              <button
+                key={opt.days}
+                type="button"
+                title={`${opt.label} — ${opt.hint}`}
+                onClick={() =>
+                  setDraft((d) => ({
+                    ...d,
+                    defaultRotationDays: opt.days as RotationIntervalDays,
+                  }))
+                }
+                className={`py-1.5 px-2 text-xs font-mono tabular-nums font-medium rounded-md transition-colors cursor-pointer whitespace-nowrap ${
+                  draft.defaultRotationDays === opt.days
+                    ? 'bg-[#1C2330] text-amber-300'
+                    : 'text-[#94A3B8] hover:text-[#F1F5F9]'
+                }`}
+              >
+                {opt.shortLabel}
+              </button>
+            ))}
+          </div>
+          <p className="text-[11px] text-[#94A3B8] leading-relaxed">
+            Guía exclusivamente visual para recordar renovaciones periódicas (verde = vigente, ámbar = próxima, rojo = sugerida para cambio). No envía alertas ni bloquea el acceso; puedes personalizar cada credencial individualmente.
+          </p>
         </div>
 
         <label className="flex items-start gap-3 rounded-lg border border-[#242C3A] bg-[#0F131A] p-3.5 cursor-pointer">

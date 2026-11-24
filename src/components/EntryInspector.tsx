@@ -14,8 +14,19 @@ import {
   X,
 } from 'lucide-react';
 import { calculateEntropyBits } from '../crypto/engine';
-import type { OcrNoiseLevel, VaultCategory, VaultEntry } from '../types/vault';
+import type {
+  OcrNoiseLevel,
+  RotationIntervalDays,
+  VaultCategory,
+  VaultEntry,
+} from '../types/vault';
+import {
+  evaluatePasswordRotation,
+  getRotationLabel,
+  ROTATION_OPTIONS,
+} from '../utils/passwordRotation';
 import { CanvasSecretViewer } from './CanvasSecretViewer';
+import { RotationTrafficLight } from './RotationTrafficLight';
 import { SecureVirtualKeypad } from './SecureVirtualKeypad';
 
 interface EntryInspectorProps {
@@ -23,10 +34,14 @@ interface EntryInspectorProps {
   isCreating: boolean;
   categories: VaultCategory[];
   defaultCategoryId: string;
+  defaultRotationDays: RotationIntervalDays;
   noiseLevel: OcrNoiseLevel;
   activeCopiedEntryId: string | null;
   clipboardSecondsLeft: number;
-  onSave: (data: Omit<VaultEntry, 'id' | 'createdAt' | 'updatedAt'>, existingId?: string) => Promise<void>;
+  onSave: (
+    data: Omit<VaultEntry, 'id' | 'createdAt' | 'updatedAt' | 'passwordUpdatedAt'>,
+    existingId?: string
+  ) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onCancelCreate: () => void;
   onCopyField: (value: string, label: string, entryId: string) => void;
@@ -39,6 +54,7 @@ export const EntryInspector: React.FC<EntryInspectorProps> = ({
   isCreating,
   categories,
   defaultCategoryId,
+  defaultRotationDays,
   noiseLevel,
   activeCopiedEntryId,
   clipboardSecondsLeft,
@@ -62,6 +78,7 @@ export const EntryInspector: React.FC<EntryInspectorProps> = ({
   const [url, setUrl] = useState('');
   const [notes, setNotes] = useState('');
   const [favorite, setFavorite] = useState(false);
+  const [rotationMode, setRotationMode] = useState<'default' | RotationIntervalDays>('default');
 
   const inFormMode = isCreating || editing;
 
@@ -79,6 +96,7 @@ export const EntryInspector: React.FC<EntryInspectorProps> = ({
       setUrl('');
       setNotes('');
       setFavorite(false);
+      setRotationMode('default');
     } else if (entry) {
       setEditing(false);
       setTitle(entry.title);
@@ -88,6 +106,7 @@ export const EntryInspector: React.FC<EntryInspectorProps> = ({
       setUrl(entry.url);
       setNotes(entry.notes);
       setFavorite(entry.favorite);
+      setRotationMode(entry.rotationIntervalDays ?? 'default');
     } else {
       // Clear draft secrets from RAM when no entry is selected
       setEditing(false);
@@ -98,6 +117,7 @@ export const EntryInspector: React.FC<EntryInspectorProps> = ({
       setUrl('');
       setNotes('');
       setFavorite(false);
+      setRotationMode('default');
     }
   }, [entry, isCreating, defaultCategoryId, categories]);
 
@@ -121,6 +141,7 @@ export const EntryInspector: React.FC<EntryInspectorProps> = ({
       setUrl('');
       setNotes('');
       setFavorite(false);
+      setRotationMode('default');
       onCancelCreate();
       return;
     }
@@ -133,6 +154,7 @@ export const EntryInspector: React.FC<EntryInspectorProps> = ({
       setUrl(entry.url);
       setNotes(entry.notes);
       setFavorite(entry.favorite);
+      setRotationMode(entry.rotationIntervalDays ?? 'default');
     } else {
       setTitle('');
       setUsername('');
@@ -140,12 +162,18 @@ export const EntryInspector: React.FC<EntryInspectorProps> = ({
       setUrl('');
       setNotes('');
       setFavorite(false);
+      setRotationMode('default');
     }
   };
 
   const entropy = useMemo(
     () => calculateEntropyBits(inFormMode ? password : entry?.password ?? ''),
     [inFormMode, password, entry?.password]
+  );
+
+  const rotationEval = useMemo(
+    () => (entry ? evaluatePasswordRotation(entry, defaultRotationDays) : null),
+    [entry, defaultRotationDays]
   );
 
   const categoryName = useMemo(() => {
@@ -169,18 +197,22 @@ export const EntryInspector: React.FC<EntryInspectorProps> = ({
 
     setSaving(true);
     try {
-      await onSave(
-        {
-          title: title.trim(),
-          categoryId,
-          username: username.trim(),
-          password,
-          url: url.trim(),
-          notes: notes.trim(),
-          favorite,
-        },
-        isCreating ? undefined : entry?.id
-      );
+      const savePayload: Omit<
+        VaultEntry,
+        'id' | 'createdAt' | 'updatedAt' | 'passwordUpdatedAt'
+      > = {
+        title: title.trim(),
+        categoryId,
+        username: username.trim(),
+        password,
+        url: url.trim(),
+        notes: notes.trim(),
+        favorite,
+      };
+      if (rotationMode !== 'default') {
+        savePayload.rotationIntervalDays = rotationMode;
+      }
+      await onSave(savePayload, isCreating ? undefined : entry?.id);
       setEditing(false);
       setShowKeypad(false);
     } catch (err) {
@@ -383,6 +415,29 @@ export const EntryInspector: React.FC<EntryInspectorProps> = ({
 
           <div className="space-y-1.5">
             <label className="block text-xs font-medium text-[#94A3B8]">
+              Periodicidad de cambio (semáforo visual)
+            </label>
+            <select
+              value={rotationMode === 'default' ? 'default' : String(rotationMode)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setRotationMode(val === 'default' ? 'default' : (Number(val) as RotationIntervalDays));
+              }}
+              className="w-full rounded-lg border border-[#242C3A] bg-[#0A0C10] px-3 py-2 text-xs text-[#F1F5F9] focus:border-amber-500 focus:outline-none"
+            >
+              <option value="default">
+                Predeterminada de la bóveda ({getRotationLabel(defaultRotationDays)})
+              </option>
+              {ROTATION_OPTIONS.map((opt) => (
+                <option key={opt.days} value={String(opt.days)}>
+                  {opt.label} — {opt.hint}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="block text-xs font-medium text-[#94A3B8]">
               Notas seguras / códigos de recuperación
             </label>
             <textarea
@@ -523,6 +578,19 @@ export const EntryInspector: React.FC<EntryInspectorProps> = ({
             height={58}
           />
         </div>
+
+        {/* Semáforo de vigencia / recordatorio visual de cambio */}
+        {rotationEval && (
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium text-[#94A3B8]">
+              Vigencia y recordatorio visual
+            </p>
+            <RotationTrafficLight
+              evaluation={rotationEval}
+              onRequestEdit={() => setEditing(true)}
+            />
+          </div>
+        )}
 
         {/* URL / Host */}
         {entry!.url && (
